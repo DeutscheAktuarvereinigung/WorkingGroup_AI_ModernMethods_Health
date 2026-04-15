@@ -1,0 +1,13 @@
+tarif_id;bezeichnung;tarifwerk;tarifart;rechnungszins;geschlossen
+CL-AMB;Classic Ambulant;Classic;ambulant;0.025;True
+CL-STAT;Classic Stationär;Classic;stationaer;0.025;True
+CL-ZAHN;Classic Zahn;Classic;zahn;0.025;True
+CL-VOLL;Classic Vollversicherung;Classic;voll;0.025;True
+KO-AMB;Komfort Ambulant;Komfort;ambulant;0.0175;False
+KO-STAT;Komfort Stationär;Komfort;stationaer;0.0175;False
+KO-ZAHN;Komfort Zahn;Komfort;zahn;0.0175;False
+KO-VOLL;Komfort Vollversicherung;Komfort;voll;0.0175;False
+PR-AMB;Premium Ambulant;Premium;ambulant;0.01;False
+PR-STAT;Premium Stationär;Premium;stationaer;0.01;False
+PR-ZAHN;Premium Zahn;Premium;zahn;0.01;False
+PR-VOLL;Premium Vollversicherung;Premium;voll;0.01;False
