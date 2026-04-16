@@ -26,6 +26,7 @@ def render_limitierung(
     df_tarife,
     GRUPPIER_DIMENSIONEN,
     berechne_barwertfaktoren,
+    berechne_barwertfaktoren_befristet,
     berechne_limitierung,
     berechne_sensitivitaet,
     formatiere_euro,
@@ -324,6 +325,80 @@ def render_limitierung(
 
             st.markdown("---")
 
+            # --- Befristungsmischung ---
+            st.markdown("### ⏱️ Befristungsmischung")
+            st.caption(
+                "Reduzieren Sie den RfB-Bedarf, indem ein Teil der Limitierung nur befristet gewährt wird. "
+                "Nach Ablauf der Befristung trägt der Versicherte den vollen Mehrbeitrag."
+            )
+
+            bf_col1, bf_col2 = st.columns(2)
+            with bf_col1:
+                anteil_befristet = st.slider(
+                    "Anteil befristete Limitierung",
+                    min_value=0, max_value=100, value=0, step=5,
+                    format="%d %%",
+                    key="anteil_befristet",
+                    help="0 % = vollständig dauerhaft, 100 % = vollständig befristet",
+                )
+            with bf_col2:
+                befristung_jahre = st.number_input(
+                    "Befristungsdauer (Jahre)",
+                    min_value=1, max_value=30, value=5, step=1,
+                    key="befristung_jahre",
+                    help="Zeitraum in Jahren, für den die befristete Limitierung gilt.",
+                )
+
+            if anteil_befristet > 0:
+                ao_hash_bef = df_hash(df_ao)
+                df_bwf_befristet = berechne_barwertfaktoren_befristet(
+                    ao_hash_bef, df_ao, df_tarife, befristung_jahre
+                )
+
+                bwf_bef_merged = df_lim_aktuell[["tarif_id", "geschlecht", "alter"]].merge(
+                    df_bwf_befristet, on=["tarif_id", "geschlecht", "alter"], how="left"
+                )
+                bwf_bef_werte = bwf_bef_merged["barwertfaktor_befristet"].fillna(0).values
+
+                p = anteil_befristet / 100.0
+                diff_mon = res["differenz_monatlich"].values
+                einmaleinlage_befristet = np.round(diff_mon * 12 * bwf_bef_werte, 2)
+                einmaleinlage_gemischt = np.round(
+                    (1 - p) * res["einmaleinlage"].values + p * einmaleinlage_befristet, 2
+                )
+
+                bedarf_gemischt = einmaleinlage_gemischt.sum()
+                bedarf_befristet_voll = einmaleinlage_befristet.sum()
+                einsparung = bedarf - bedarf_gemischt
+
+                bf_m1, bf_m2, bf_m3, bf_m4 = st.columns(4)
+                with bf_m1:
+                    st.metric("RfB-Bedarf (dauerhaft)", formatiere_euro(bedarf))
+                with bf_m2:
+                    st.metric("RfB-Bedarf (gemischt)", formatiere_euro(bedarf_gemischt))
+                with bf_m3:
+                    st.metric(
+                        "Einsparung", formatiere_euro(einsparung),
+                        delta=f"{einsparung / bedarf * 100:.1f} %" if bedarf > 0 else "–",
+                    )
+                with bf_m4:
+                    diff_budget_gem = budget_val - bedarf_gemischt
+                    st.metric(
+                        "Differenz zum Budget", formatiere_euro(diff_budget_gem),
+                        delta=f"{'Über' if diff_budget_gem >= 0 else 'Unter'}deckung",
+                    )
+
+                st.info(
+                    f"**Mischung:** {100 - anteil_befristet} % dauerhaft + "
+                    f"{anteil_befristet} % befristet ({befristung_jahre} Jahre)\n\n"
+                    f"- RfB-Bedarf bei 100 % dauerhaft: {formatiere_euro(bedarf)}\n"
+                    f"- RfB-Bedarf bei 100 % befristet ({befristung_jahre} J.): "
+                    f"{formatiere_euro(bedarf_befristet_voll)}\n"
+                    f"- RfB-Bedarf bei aktueller Mischung: {formatiere_euro(bedarf_gemischt)}"
+                )
+
+            st.markdown("---")
+
             # --- Treemap: Verwendete RfB-Mittel ---
             st.markdown("### Verteilung der RfB-Mittel")
 
@@ -331,6 +406,7 @@ def render_limitierung(
             TREEMAP_EBENEN = {
                 "Tarifwerk": "tarifwerk",
                 "Tarifart": "tarifart",
+                "Tarif": "tarif_id",
                 "Geschlecht": "geschlecht",
                 "Altersgruppe": "altersgruppe",
             }
@@ -341,18 +417,43 @@ def render_limitierung(
                 key="lim_treemap_hierarchie",
             )
 
+            tm_cfg1, tm_cfg2 = st.columns(2)
+            with tm_cfg1:
+                tm_statistik = st.selectbox(
+                    "Statistik (vorher/nachher)",
+                    ["Durchschnitt (Ø)", "P95", "P99", "Maximum"],
+                    index=0, key="tm_statistik",
+                )
+
             if len(treemap_reihenfolge) == 0:
                 st.warning("Bitte mindestens eine Ebene wählen.")
             else:
                 hierarchie_spalten = [TREEMAP_EBENEN[e] for e in treemap_reihenfolge]
 
                 df_tree_src = df_lim_aktuell[list(set(hierarchie_spalten + ["versicherten_id"]))].copy()
-                df_tree_src["einmaleinlage"] = res["einmaleinlage"].values
+                # Gemischte Einmaleinlage verwenden, falls Befristung aktiv
+                if anteil_befristet > 0:
+                    df_tree_src["einmaleinlage"] = einmaleinlage_gemischt
+                else:
+                    df_tree_src["einmaleinlage"] = res["einmaleinlage"].values
+                df_tree_src["erh_vorher_pct"] = df_lim_aktuell["erhoehung_prozent"].values
+                df_tree_src["erh_vorher_abs"] = df_lim_aktuell["erhoehung_absolut"].values
+                df_tree_src["erh_nachher_pct"] = res["erhoehung_limitiert_pct"].values
+                df_tree_src["erh_nachher_abs"] = res["erhoehung_limitiert_abs"].values
 
                 label_fn = {
                     "geschlecht": _geschlecht_label,
                     "tarifart": lambda x: str(x).capitalize(),
                 }
+
+                # Aggregationsfunktion je nach Statistik-Wahl
+                stat_map = {
+                    "Durchschnitt (Ø)": ("mean", "Ø"),
+                    "P95": (lambda s: s.quantile(0.95), "P95"),
+                    "P99": (lambda s: s.quantile(0.99), "P99"),
+                    "Maximum": ("max", "Max"),
+                }
+                stat_fn, stat_label = stat_map[tm_statistik]
 
                 # Dynamisch alle Stufen der Hierarchie aufbauen
                 alle_stufen = []
@@ -362,6 +463,10 @@ def render_limitierung(
                         anzahl=("versicherten_id", "count"),
                         rfb_summe=("einmaleinlage", "sum"),
                         rfb_mean=("einmaleinlage", "mean"),
+                        erh_vorher_pct_stat=("erh_vorher_pct", stat_fn),
+                        erh_vorher_abs_stat=("erh_vorher_abs", stat_fn),
+                        erh_nachher_pct_stat=("erh_nachher_pct", stat_fn),
+                        erh_nachher_abs_stat=("erh_nachher_abs", stat_fn),
                     ).reset_index()
                     agg["rfb_summe_mio"] = agg["rfb_summe"] / 1e6
                     agg["id"] = agg[grp_cols].astype(str).agg("/".join, axis=1)
@@ -378,9 +483,15 @@ def render_limitierung(
                     else:
                         agg["label"] = agg[letzte_spalte].astype(str)
 
-                    alle_stufen.append(agg[["id", "parent", "label", "anzahl", "rfb_summe_mio", "rfb_mean"]])
+                    alle_stufen.append(agg[[
+                        "id", "parent", "label", "anzahl", "rfb_summe_mio", "rfb_mean",
+                        "erh_vorher_pct_stat", "erh_vorher_abs_stat",
+                        "erh_nachher_pct_stat", "erh_nachher_abs_stat",
+                    ]])
 
                 alle_t = pd.concat(alle_stufen, ignore_index=True)
+
+                rfb_label = "RfB-Mittel gemischt (Mio. €)" if anteil_befristet > 0 else "RfB-Mittel (Mio. €)"
 
                 fig_tm = go.Figure(go.Treemap(
                     ids=alle_t["id"].values, labels=alle_t["label"].values,
@@ -390,27 +501,41 @@ def render_limitierung(
                         colors=alle_t["rfb_summe_mio"].values,
                         colorscale=[[0, "#EBF5FF"], [0.3, DAV_BLAU_AKZENT], [0.7, DAV_ORANGE], [1, "#D0021B"]],
                         cmin=0, cmax=alle_t["rfb_summe_mio"].max(),
-                        colorbar=dict(title="RfB-Mittel (Mio. €)"),
+                        colorbar=dict(title=rfb_label),
                     ),
                     customdata=np.column_stack([
                         alle_t["rfb_summe_mio"].round(1).values,
                         alle_t["anzahl"].values,
                         alle_t["rfb_mean"].round(0).values,
+                        alle_t["erh_vorher_pct_stat"].round(1).values,
+                        alle_t["erh_vorher_abs_stat"].round(0).values,
+                        alle_t["erh_nachher_pct_stat"].round(1).values,
+                        alle_t["erh_nachher_abs_stat"].round(0).values,
                     ]),
                     hovertemplate=(
                         "<b>%{label}</b><br>"
                         "Anzahl: %{customdata[1]:,}<br>"
-                        "RfB-Mittel: %{customdata[0]:.1f} Mio. €<br>"
-                        "Ø Einmaleinlage: %{customdata[2]:.0f} €"
+                        f"{rfb_label}: %{{customdata[0]:.1f}} Mio. €<br>"
+                        "Ø Einmaleinlage: %{customdata[2]:.0f} €<br><br>"
+                        f"<b>{stat_label} Erhöhung vorher</b><br>"
+                        "%{customdata[3]:.1f} % · %{customdata[4]:.0f} €/Mon<br>"
+                        f"<b>{stat_label} Erhöhung nachher</b><br>"
+                        "%{customdata[5]:.1f} % · %{customdata[6]:.0f} €/Mon"
                         "<extra></extra>"
                     ),
-                    texttemplate="<b>%{label}</b><br>n=%{customdata[1]:,}<br>%{customdata[0]:.1f} Mio. €",
+                    texttemplate=(
+                        "<b>%{label}</b><br>n=%{customdata[1]:,}<br>"
+                        "%{customdata[0]:.1f} Mio. €<br>"
+                        f"vorher %{{customdata[3]:.1f}}% / %{{customdata[4]:.0f}}€<br>"
+                        f"nachher %{{customdata[5]:.1f}}% / %{{customdata[6]:.0f}}€"
+                    ),
                     maxdepth=2,
                 ))
                 hierarchie_text = " → ".join(treemap_reihenfolge)
+                titel_suffix = " (gemischt)" if anteil_befristet > 0 else ""
                 fig_tm.update_layout(
                     **PLOTLY_LAYOUT,
-                    title=f"Treemap — RfB-Mittel ({hierarchie_text})",
+                    title=f"Treemap — RfB-Mittel{titel_suffix} ({hierarchie_text}) — {stat_label}",
                     height=520,
                 )
                 st.plotly_chart(fig_tm, use_container_width=True)

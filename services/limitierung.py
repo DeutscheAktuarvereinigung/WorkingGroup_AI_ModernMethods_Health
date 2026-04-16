@@ -91,6 +91,60 @@ def berechne_barwertfaktoren(df_ao: pd.DataFrame, df_tarife: pd.DataFrame) -> pd
     return pd.DataFrame(ergebnisse)
 
 
+def berechne_barwertfaktoren_befristet(df_ao: pd.DataFrame, df_tarife: pd.DataFrame, laufzeit_jahre: int) -> pd.DataFrame:
+    """
+    Berechnet befristete Barwertfaktoren (temporäre Annuitätenfaktoren).
+
+    Wie berechne_barwertfaktoren, aber die Summation ist auf laufzeit_jahre begrenzt.
+    Nach Ablauf der Befristung trägt der Versicherte den vollen Mehrbeitrag.
+
+    Args:
+        df_ao: Ausscheideordnung (tarif_id, geschlecht, alter, qx, storno)
+        df_tarife: Tarifstammdaten (tarif_id, rechnungszins)
+        laufzeit_jahre: Befristungsdauer in Jahren
+
+    Returns:
+        DataFrame mit tarif_id, geschlecht, alter, barwertfaktor_befristet
+    """
+    ergebnisse = []
+
+    for _, tarif in df_tarife.iterrows():
+        tid = tarif["tarif_id"]
+        i = tarif["rechnungszins"]
+        v = 1.0 / (1.0 + i)
+
+        for geschl in ["M", "W"]:
+            ao_teil = df_ao[(df_ao["tarif_id"] == tid) & (df_ao["geschlecht"] == geschl)].sort_values("alter")
+            if len(ao_teil) == 0:
+                continue
+
+            qx_arr = ao_teil["qx"].values
+            wx_arr = ao_teil["storno"].values
+            max_alter = len(qx_arr)
+
+            for x in range(max_alter):
+                ax = 0.0
+                tp = 1.0
+                for t in range(1, min(laufzeit_jahre + 1, max_alter - x)):
+                    alter_idx = x + t - 1
+                    if alter_idx >= max_alter:
+                        break
+                    ausch = min(qx_arr[alter_idx] + wx_arr[alter_idx], 1.0)
+                    tp *= (1.0 - ausch)
+                    if tp < 1e-10:
+                        break
+                    ax += (v ** t) * tp
+
+                ergebnisse.append({
+                    "tarif_id": tid,
+                    "geschlecht": geschl,
+                    "alter": x,
+                    "barwertfaktor_befristet": round(ax, 6),
+                })
+
+    return pd.DataFrame(ergebnisse)
+
+
 def berechne_limitierung(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln, modus, laufzeit_jahre) -> pd.DataFrame:
     """
     Berechnet limitierte (begrenzte) Prämiensteigerungen basierend auf definierten Limitierungsregeln.

@@ -57,20 +57,61 @@ TARIFE = [
 # =============================================================================
 
 def erzeuge_pkv_sterbetafel():
-    A_m, B_m, c_m = 0.0002461254, 0.0000004204, 1.165858
-    A_f, B_f, c_f = 0.000086413324, 0.000003352459, 1.11574556
-    alter = np.arange(0, ENDALTER + 1)
-    qx_m = 1.0 - np.exp(-(A_m + B_m * np.power(c_m, alter)))
-    qx_f = 1.0 - np.exp(-(A_f + B_f * np.power(c_f, alter)))
-    kind_m = [0.003,0.00025,0.00018,0.00015,0.00012,0.0001,0.00009,0.00009,0.00008,0.00008,0.00008]
-    kind_f = [0.0025,0.0002,0.00014,0.00012,0.0001,0.00008,0.00007,0.00007,0.00007,0.00006,0.00006]
-    for i in range(11):
-        qx_m[i] = max(qx_m[i], kind_m[i])
-        qx_f[i] = max(qx_f[i], kind_f[i])
-    qx_m[ENDALTER] = 1.0
-    qx_f[ENDALTER] = 1.0
-    df_m = pd.DataFrame({"alter": alter, "geschlecht": "M", "qx": np.clip(qx_m, 0, 1)})
-    df_f = pd.DataFrame({"alter": alter, "geschlecht": "W", "qx": np.clip(qx_f, 0, 1)})
+    """Lade echte PKV-Sterbetafel aus CSV-Datei.
+    
+    Liest die offizielle PKV-Sterbetafel 2026 aus der lokalen CSV-Datei,
+    validiert die Daten und konvertiert sie in das interne Format.
+    Trennt die Daten nach Geschlecht (M/W) und clippt Sterbewahrscheinlichkeiten
+    auf den zulässigen Bereich [0, 1].
+    
+    Returns:
+        pd.DataFrame: Sterbetafel mit Spalten:
+            - alter: Alter (0-100+)
+            - geschlecht: 'M' (Männer, qx) oder 'W' (Frauen, qy)
+            - qx: Sterbewahrscheinlichkeit, clipped auf [0, 1]
+    
+    Raises:
+        FileNotFoundError: Falls pkv_sterbetafel.csv nicht im Arbeitsverzeichnis liegt
+        ValueError: Falls erforderliche Spalten (Alter, qx, qy) fehlen oder
+                   nicht numerisch konvertiert werden können
+    
+    Notes:
+        - qx: Alter- und geschlechtsspezifische Sterbewahrscheinlichkeit (Männer)
+        - qy: Alter- und geschlechtsspezifische Sterbewahrscheinlichkeit (Frauen)
+        - Format: CSV mit Header, Separator ","
+    """
+    # Lade echte PKV-Sterbetafel aus CSV
+    tafel_pfad = "pkv_sterbetafel.csv"
+    df = pd.read_csv(tafel_pfad, sep=",", skiprows=1)
+    
+    # Bereinige Spalten: entferne Leerzeichen aus Spaltennamen
+    df.columns = df.columns.str.strip()
+    df = df.dropna()
+    
+    # Konvertiere zu numerisch (fehlerhafte Werte werden NaN)
+    df["Alter"] = pd.to_numeric(df["Alter"], errors="coerce")
+    df["qx"] = pd.to_numeric(df["qx"], errors="coerce")
+    df["qy"] = pd.to_numeric(df["qy"], errors="coerce")
+    
+    # Entferne Zeilen mit NaN (nach Konvertierung)
+    df = df.dropna()
+    alter_values = df["Alter"].values.astype(int)
+    
+    # Splitte Daten nach Geschlecht:
+    # - qx = Sterbewahrscheinlichkeit Männer
+    # - qy = Sterbewahrscheinlichkeit Frauen
+    df_m = pd.DataFrame({
+        "alter": alter_values,
+        "geschlecht": "M",
+        "qx": np.clip(df["qx"].values, 0, 1)  # Clippe auf [0, 1] zur Sicherheit
+    })
+    
+    df_f = pd.DataFrame({
+        "alter": alter_values,
+        "geschlecht": "W",
+        "qx": np.clip(df["qy"].values, 0, 1)  # Clippe auf [0, 1] zur Sicherheit
+    })
+    
     return pd.concat([df_m, df_f], ignore_index=True)
 
 
@@ -79,26 +120,76 @@ def erzeuge_pkv_sterbetafel():
 # =============================================================================
 
 def erzeuge_ausscheideordnung(df_tarife, sterbetafel):
+    """Erzeuge tarifspezifische Ausscheideordnung.
+    
+    Kombiniert Sterbetafel und Stornoquoten für jeden Tarif und jede
+    Alter-Geschlecht-Kombination. Berücksichtigt tarifwerk-spezifische
+    Sterblichkeitsfaktoren und geschlossen vs. offene Tarife mit
+    unterschiedlichen Stornoquoten-Profilen.
+    
+    Args:
+        df_tarife (pd.DataFrame): Tarifseigenschaften mit Spalten:
+            - tarif_id: Eindeutige Tarif-ID (z.B. 'CL-AMB')
+            - tarifwerk: Tarifwerk-Kategorie ('Classic', 'Komfort', 'Premium')
+            - geschlossen: bool, ob Tarifwerk geschlossen ist
+        sterbetafel (pd.DataFrame): Sterbetafel mit Spalten:
+            - alter: Lebensalter
+            - geschlecht: 'M' oder 'W'
+            - qx: Sterbewahrscheinlichkeit
+    
+    Returns:
+        pd.DataFrame: Ausscheideordnung mit Spalten:
+            - tarif_id: Tarif-Identifier
+            - alter: Lebensalter (0-100+)
+            - geschlecht: 'M' oder 'W'
+            - qx: Tarifwerk-adjustierte Sterbwahrscheinlichkeit
+            - storno: Stornoquote (relative Häufigkeit von Versicherungsauflösungen)
+    
+    Notes:
+        Stornoquoten-Profile:
+        - Geschlossene Tarife: exponentiell fallend mit Alter (0.5%-0.1%)
+        - Offene Tarife: Age-Banded (6% bei <25J, fallend bis 0.2% bei >65J)
+        - Klassische Annahme: Ältere reduzieren häufiger bei geschlossenen Tarifen
+    """
     zeilen = []
     for _, tarif in df_tarife.iterrows():
         tid = tarif["tarif_id"]
         tw = tarif["tarifwerk"]
         geschl = tarif["geschlossen"]
+        # Tarifwerk-spezifische Sterblichkeits-Adjustierung
+        # Classic: höhere Mortalität (älteres Risikokollektiv)
+        # Premium: niedrigere Mortalität (bessere Risikoselektion)
         sf = {"Classic": 1.05, "Komfort": 1.00, "Premium": 0.97}[tw]
 
         for _, z in sterbetafel.iterrows():
             a, g, qx = z["alter"], z["geschlecht"], min(z["qx"] * sf, 1.0)
+            
+            # Berechne Stornoquote basierend auf Tarifwerk und Alter
             if geschl:
+                # Geschlossene Tarife: exponentiell fallend (Ältere weniger Storno)
                 storno = max(0.001, 0.005 * np.exp(-0.03 * a))
             else:
-                if a < 25: storno = 0.06
-                elif a < 35: storno = 0.04
-                elif a < 45: storno = 0.025
-                elif a < 55: storno = 0.012
-                elif a < 65: storno = 0.005
-                else: storno = 0.002
-            zeilen.append({"tarif_id": tid, "alter": a, "geschlecht": g,
-                           "qx": round(qx, 8), "storno": round(storno, 6)})
+                # Offene Tarife: altersgestaffelt (junge Menschen haben höhere Storno)
+                if a < 25:
+                    storno = 0.06      # 6% bei unter 25
+                elif a < 35:
+                    storno = 0.04      # 4% bei 25-34
+                elif a < 45:
+                    storno = 0.025     # 2.5% bei 35-44
+                elif a < 55:
+                    storno = 0.012     # 1.2% bei 45-54
+                elif a < 65:
+                    storno = 0.005     # 0.5% bei 55-64
+                else:
+                    storno = 0.002     # 0.2% bei 65+
+            
+            zeilen.append({
+                "tarif_id": tid,
+                "alter": a,
+                "geschlecht": g,
+                "qx": round(qx, 8),           # 8 Dezimalstellen für Genauigkeit
+                "storno": round(storno, 6)   # 6 Dezimalstellen
+            })
     return pd.DataFrame(zeilen)
 
 
@@ -107,84 +198,126 @@ def erzeuge_ausscheideordnung(df_tarife, sterbetafel):
 # =============================================================================
 
 def erzeuge_bestand(df_tarife, mittlere_anpassung, rng):
+    """Erzeuge 1 Mio. realistischer PKV-Versichertendaten mit Prämienanpassungen.
+    
+    Implementiert ein hochrealistisches Modell zur Simulation von PKV-Bestandsdaten
+    mit starker Differenzierung nach Tarif, Alter, Geschlecht und Versicherungsdauer.
+    Die Prämienanpassungen folgen einer tarifwerk-spezifischen skalierten Beta-Verteilung
+    mit Alters-, Dauer- und Geschlechtseffekten.
+    
+    Args:
+        df_tarife (pd.DataFrame): Tarifseigenschaften
+        mittlere_anpassung (float): Zielwert für Ø Anpassung als Dezimal (z.B. 0.30)
+        rng (np.random.Generator): Zufallsgenerator (für Reproduzierbarkeit)
+    
+    Returns:
+        pd.DataFrame: Versichertendaten mit 15 Spalten:
+            - versicherten_id, geburtsdatum, alter, geschlecht
+            - tarifwerk, tarif_id, tarifart
+            - versicherungsbeginn, versicherungsdauer_jahre
+            - praemie_alt_monatlich, praemie_neu_monatlich
+            - erhoehung_absolut, erhoehung_prozent
+            - erhoehung_historisch_kumuliert, alterungsrueckstellung
+    """
     n = ANZAHL_VERSICHERTE
-    print(f"\n  Erzeuge {n:,} Versicherte ...")
 
-    # --- 1. Tarif-Zuweisung ---
     tarifwerk_wahl = rng.choice(["Classic", "Komfort", "Premium"], size=n, p=[0.25, 0.45, 0.30])
     tarifart_wahl = rng.choice(["voll", "ambulant", "stationaer", "zahn"], size=n, p=[0.50, 0.20, 0.15, 0.15])
     prefix_map = {"Classic": "CL", "Komfort": "KO", "Premium": "PR"}
     art_map = {"voll": "VOLL", "ambulant": "AMB", "stationaer": "STAT", "zahn": "ZAHN"}
     tarif_ids = np.array([f"{prefix_map[tw]}-{art_map[ta]}" for tw, ta in zip(tarifwerk_wahl, tarifart_wahl)])
 
-    # --- 2. Alter — breitere Verteilung mit mehr Extremen ---
-    alter_raw = rng.beta(4.0, 2.8, size=n)  # etwas flacher → mehr Ältere
+    # --- 2. Alter — Beta-Verteilung für realistische Altersstruktur ---
+    # Beta(4.0, 2.8) ist rechtsschief → mehr ältere Versicherte als Junge
+    # Realistisch für PKV (höhere Alterskonzentration)
+    alter_raw = rng.beta(4.0, 2.8, size=n)
+    # Skaliere auf Bereich 18-95 Jahre (Mindesteintrittsalter 18, kaum 100+)
     alter = np.round(18 + alter_raw * 77).astype(int)  # 18 bis 95
-    alter = np.clip(alter, 18, 95)
+    alter = np.clip(alter, 18, 95)  # Sicherstelle Gültigkeitsbereich
 
-    # Geburtsdatum
+    # Berechne Geburtsdaten: zufälliger Tag im Geburtsjahr
     geburtsjahre = STICHTAG.year - alter
     geburtsdaten = np.array([
-        date(int(j), 1, 1) + timedelta(days=int(t))
+        date(int(j), 1, 1) + timedelta(days=int(t))  # 1.1. + random Tage
         for j, t in zip(geburtsjahre, rng.integers(0, 365, size=n))
     ])
 
-    # --- 3. Geschlecht ---
+    # --- 3. Geschlecht (55% Männer, 45% Frauen, realistische PKV-Quote) ---
     geschlecht = rng.choice(["M", "W"], size=n, p=[0.55, 0.45])
 
-    # --- 4. Versicherungsdauer ---
+    # --- 4. Versicherungsdauer (Tarifwerk-abhängig) ---
+    # Classic: lange Bindung (15-40 Jahre, nicht zu häufig gewechselt)
+    # Komfort: mittel (5-25 Jahre)
+    # Premium: höhere Fluktuation (1-12 Jahre, neuere Tarife)
     mc = tarifwerk_wahl == "Classic"
     mk = tarifwerk_wahl == "Komfort"
     mp = tarifwerk_wahl == "Premium"
     vd = np.zeros(n, dtype=int)
-    vd[mc] = rng.integers(15, 40, size=mc.sum())  # bis 40 Jahre
-    vd[mk] = rng.integers(5, 25, size=mk.sum())   # bis 25 Jahre
+    vd[mc] = rng.integers(15, 40, size=mc.sum())
+    vd[mk] = rng.integers(5, 25, size=mk.sum())
     vd[mp] = rng.integers(1, 12, size=mp.sum())
+    # Clipping: Versicherungsdauer kann max. (Alter - 18) sein
     vd = np.minimum(vd, np.maximum(alter - 18, 1))
+    
+    # Berechne Versicherungsbeginn-Datum rückwärts
     vb_j = STICHTAG.year - vd
     versicherungsbeginn = np.array([
         date(int(j), 1, 1) + timedelta(days=int(rng.integers(0, 365)))
         for j in vb_j
     ])
 
-    # --- 5. Bisherige Monatsprämie — stärkere Differenzierung ---
-    # Basis je Tarifart
+    # --- 5. Bisherige Monatsprämie (komplexe Multiplikativ-Faktorenlogik) ---
+    # Basis: je Tarifart (Ärztegebühren, Krankenhaus, Zahnersatz)
     bp_map = {"voll": 380.0, "ambulant": 190.0, "stationaer": 130.0, "zahn": 55.0}
     bp = np.array([bp_map[ta] for ta in tarifart_wahl])
 
-    # Altersfaktor: exponentieller als vorher
+    # Altersfaktor: exponentiell steigende Prämien mit Alter
+    # Formel: 0.6 + 0.4 * exp(0.018 * (age - 30))
+    # Effekt: Bei 30J: 1.0x, Bei 50J: 1.2x, Bei 70J: 1.6x
     af = 0.6 + 0.4 * np.exp(0.018 * (alter - 30))
-    af = np.clip(af, 0.6, 3.5)
+    af = np.clip(af, 0.6, 3.5)  # Realistisches Spektrum
 
-    # Tarifwerk-Faktor
+    # Tarifwerk-Faktor (Risiko- und Kostenstruktur)
     twf = np.ones(n)
-    twf[mc] = 1.20  # Classic ist teurer geworden
-    twf[mk] = 1.05
+    twf[mc] = 1.20  # Classic: Älteres Kollektiv, höhere Kosten
+    twf[mk] = 1.05  # Komfort: Neuere Tarifgeneration
+    # Premium bleibt auf 1.0 (Basis)
 
-    # Geschlecht-Faktor (leicht, realistisch)
+    # Geschlecht-Faktor (subtil, nur bei bestimmten Tarifarten)
     gf = np.ones(n)
-    gf[(geschlecht == "M") & (tarifart_wahl == "voll")] = 1.04
-    gf[(geschlecht == "W") & (tarifart_wahl == "ambulant")] = 1.06
+    gf[(geschlecht == "M") & (tarifart_wahl == "voll")] = 1.04  # Männer zahlen mehr für Voll
+    gf[(geschlecht == "W") & (tarifart_wahl == "ambulant")] = 1.06  # Frauen für Ambulant
 
-    # Versicherungsdauer-Effekt: längere Dauer → Prämie schon mehrfach angepasst
+    # Versicherungsdauer-Effekt: Längere Dauer → bereits mehrfach angepasst
+    # +0.5% pro Versicherungsjahr (max. 25% Aufschlag)
     df_eff = 1.0 + 0.005 * vd
     df_eff = np.clip(df_eff, 1.0, 1.25)
 
+    # Kombiniere alle Faktoren multiplikativ
     bp = bp * af * twf * gf * df_eff
 
-    # Individuelles Rauschen (±20%, breiter als vorher)
+    # Individuelles Rauschen (Basis-Prämie wird variiert)
+    # Normal(0, 0.12) → ±12 Std.Abw., dann clippt auf [0.6, 1.5]
     rauschen = np.clip(1.0 + rng.normal(0, 0.12, size=n), 0.6, 1.5)
+    # Minimum 25€ als physikalisches Limit
     praemie_alt = np.maximum(np.round(bp * rauschen, 2), 25.0)
 
-    # --- 6. Prämienanpassung — Skalierte Beta-Verteilung ---
-    # Die Beta-Verteilung lebt auf [0,1] und wird auf ein tarifabhängiges Intervall
-    # [min_anp, max_anp] skaliert. Das ergibt eine natürliche Obergrenze ohne Kappung.
-    # Der kombinierte Faktor (Alter, Dauer, Geschlecht) verschiebt das Intervall.
+    # --- 6. Prämienanpassung (Zentrale Modell-Komponente) ---
+    # Methode: Skalierte Beta-Verteilung auf tarifabhängigem Intervall
+    # Vorteil: Natürliche Obergrenze (keine unerwünschten Extreme), gute Schiefe
+    # Workflow:
+    #   1. Definiere tarifspezif. Basis-Intervall [min, max] in Dezimal
+    #   2. Berechne Skalierungsfaktoren (Alter, Dauer, Geschlecht)
+    #   3. Adaptiere Intervall mit Faktoren
+    #   4. Ziehe Beta-Verteilte Werte und skaliere auf Intervall
+    #   5. Globale Skalierung auf mittlere_anpassung
     print("  Berechne Anpassungen (Beta-Verteilung) ...")
 
     # Tarif-spezifische Beta-Parameter und Intervallgrenzen
-    # alpha, beta: steuern die Form (alpha < beta → rechtsschief)
-    # basis_min, basis_max: Basis-Intervall in Dezimal (0.05 = 5%)
+    # Format: (alpha, beta, basis_min, basis_max)
+    # alpha, beta: Beta-Verteilungsparameter (alpha < beta → rechtsschief)
+    # basis_min, basis_max: Basis-Intervall in Dezimal (z.B. 0.10 = 10%)
+    # Beobachtung: Classic > Komfort > Premium (ältere Tarife mehr Anpassung)
     TARIF_BETA_PARAMS = {
         # Tarif-ID:      (alpha, beta, basis_min, basis_max)
         # Classic — breit, rechtsschief, hohe Anpassungen
@@ -204,109 +337,140 @@ def erzeuge_bestand(df_tarife, mittlere_anpassung, rng):
         "PR-ZAHN": (3.5, 7.0, 0.01, 0.25),
     }
 
-    # Alters-Faktor: verschiebt das Intervall nach oben/unten
+    # Alters-Faktor: Ältere Versicherte haben höhere Anpassungen
+    # Logik: Höheres Alter → höhere Kosten → stärkere Anpassung notwendig
+    # Range: 0.80 (jung) bis 1.45 (90+)
     alter_f = np.ones(n)
-    alter_f[alter < 30] = 0.80
+    alter_f[alter < 30] = 0.80      # Junge: -20% (niedrige Kosten)
     alter_f[(alter >= 30) & (alter < 40)] = 0.90
     alter_f[(alter >= 40) & (alter < 50)] = 0.95
     alter_f[(alter >= 50) & (alter < 60)] = 1.05
     alter_f[(alter >= 60) & (alter < 70)] = 1.15
     alter_f[(alter >= 70) & (alter < 80)] = 1.25
     alter_f[(alter >= 80) & (alter < 90)] = 1.35
-    alter_f[alter >= 90] = 1.45
+    alter_f[alter >= 90] = 1.45      # Älteste: +45% (höchste Kosten)
 
-    # Versicherungsdauer-Effekt
+    # Versicherungsdauer-Effekt: Langzeitversicherte haben mehr Anpassungen
+    # Logik: Längerer Zeitraum → mehr kumulative Anpassungen bereits eingezahlt
     dauer_f = np.ones(n)
-    dauer_f[mc & (vd >= 30)] = 1.15
-    dauer_f[mc & (vd >= 20) & (vd < 30)] = 1.08
-    dauer_f[mk & (vd >= 15)] = 1.05
+    dauer_f[mc & (vd >= 30)] = 1.15  # Classic 30+ Jahre: +15%
+    dauer_f[mc & (vd >= 20) & (vd < 30)] = 1.08  # Classic 20-29 Jahre: +8%
+    dauer_f[mk & (vd >= 15)] = 1.05  # Komfort 15+ Jahre: +5%
 
-    # Geschlecht × Tarifart Interaktion
+    # Geschlecht × Tarifart Interaktion Spezialeffekte
+    # Subtile geschlechtsspezifische Effekte je Tarifart
     ga_f = np.ones(n)
-    ga_f[(geschlecht == "W") & (tarifart_wahl == "ambulant")] = 1.06
-    ga_f[(geschlecht == "M") & (tarifart_wahl == "stationaer")] = 1.04
-    ga_f[(geschlecht == "W") & (tarifart_wahl == "voll")] = 1.03
+    ga_f[(geschlecht == "W") & (tarifart_wahl == "ambulant")] = 1.06  # Frauen Ambulant
+    ga_f[(geschlecht == "M") & (tarifart_wahl == "stationaer")] = 1.04  # Männer Stationär
+    ga_f[(geschlecht == "W") & (tarifart_wahl == "voll")] = 1.03      # Frauen Vollvers.
 
-    # Kombinierter Skalierungsfaktor
+    # Kombinierter Skalierungsfaktor (multiplikativ)
     kf = alter_f * dauer_f * ga_f
 
-    # Mittlere Anpassung als globaler Skalierungsfaktor
-    # (die Tarif-Parameter sind auf ~26% kalibriert, skaliere relativ dazu)
+    # Globale Skalierung auf target mittlere_anpassung
+    # Die Tarif-Parameter sind auf ~26% kalibriert, skaliere nun proportional
+    # Beispiel: mittlere_anpassung=0.30 → global_skala ≈ 1.15
     global_skala = mittlere_anpassung / 0.26
 
-    # Anpassung per skalierter Beta-Verteilung, tarifweise
-    anp = np.zeros(n)
+    # Berechne Anpassung pro Tarif mit skalierter Beta-Verteilung
+    anp = np.zeros(n)  # Array für alle Versicherten
     for tid, (alpha, beta_p, b_min, b_max) in TARIF_BETA_PARAMS.items():
+        # Filtere Versicherte dieses Tarifs
         maske = tarif_ids == tid
         n_tid = maske.sum()
         if n_tid == 0:
             continue
 
+        # Hole Skalierungsfaktoren für diese Versicherten
         kf_tid = kf[maske] * global_skala
 
-        # Intervall skalieren mit kombiniertem Faktor
+        # Adaptiere Basis-Intervall [b_min, b_max] mit Skalierungsfaktoren
+        # vmin: mit sqrt(kf) → moderater Aufstieg
+        # vmax: mit 0.7*log(kf) → stärkerer Aufstieg (mehr Spread bei hohem kf)
         vmin = np.clip(b_min * np.power(kf_tid, 0.5), 0.01, 0.50)
         vmax = np.clip(b_max * np.power(kf_tid, 0.7), 0.05, 0.80)
-        vmax = np.maximum(vmax, vmin + 0.03)  # mindestens 3pp Spread
+        # Garantiere mindestens 3 Prozentpunkte Spread
+        vmax = np.maximum(vmax, vmin + 0.03)
 
-        # Beta-Verteilung ziehen und skalieren
+        # Ziehe Beta-verteilte Werte ∈ [0, 1] und skaliere auf [vmin, vmax]
         raw = rng.beta(alpha, beta_p, size=n_tid)
         anp[maske] = vmin + (vmax - vmin) * raw
 
-    # Sicherstellen: mindestens 1%, maximal 80%
+    # Finales Clipping: Sicherstelle Gültigkeitsbereich
+    # Min 1% (administrative Mindesterhöhung), Max 80% (Geschäftsmodell-Limit)
     anp = np.clip(anp, 0.01, 0.80)
 
-    praemie_neu = np.round(praemie_alt * (1.0 + anp), 2)
-    erh_abs = np.round(praemie_neu - praemie_alt, 2)
-    erh_pct = np.round(anp * 100, 2)
+    # Berechne neue Prämien und Erhöhungen
+    praemie_neu = np.round(praemie_alt * (1.0 + anp), 2)  # Neue monatliche Prämie
+    erh_abs = np.round(praemie_neu - praemie_alt, 2)      # €/Monat Erhöhung
+    erh_pct = np.round(anp * 100, 2)                      # % Erhöhung
 
-    # --- 7. Alterungsrückstellung ---
-    arf = np.clip((alter - 18) / 50.0, 0.02, 1.8)
-    # Stärkerer Versicherungsdauer-Effekt
-    ar = np.maximum(np.round(praemie_alt * 12 * vd * arf * rng.uniform(0.7, 1.3, size=n), 2), 0.0)
+    # --- 7. Alterungsrückstellung (ALT: Vermögensreserve für Altersanpassung) ---
+    # Formel: Annualisierte Prämie × Versicherungsdauer × Altersfaktor × Zufallsterm
+    # Höheres Alter und längere Dauer → höhere Reserven
+    arf = np.clip((alter - 18) / 50.0, 0.02, 1.8)  # Normalisierter Altersfaktor [0.02, 1.8]
+    # Zufallsterm: Individuelle Abweichungen ±30% um erwartete Rückstellung
+    ar = np.maximum(
+        np.round(praemie_alt * 12 * vd * arf * rng.uniform(0.7, 1.3, size=n), 2),
+        0.0  # Minimum 0€
+    )
 
     # --- 8. Historische kumulierte Anpassung (letzte 3 Jahre) ---
+    # Simuliere, dass aktuelle Anpassungen korrelieren mit historischen
+    # Ziel: Realistische Darstellung von Versicherten, die bereits mehrfach erhöht wurden
     print("  Erzeuge historische Anpassungen ...")
 
-    # Basis je Tarifwerk
+    # Basis je Tarifwerk (Ø Kumulierung über 3 Jahre)
     hist_basis = np.zeros(n)
-    hist_basis[mc] = 40.0  # Classic: Ø 40% kumuliert über 3 Jahre
-    hist_basis[mk] = 22.0  # Komfort: Ø 22%
-    hist_basis[mp] = 8.0   # Premium: Ø 8%
+    hist_basis[mc] = 40.0  # Classic: ältere Tarife, häufigere Anpassungen → 40% Ø
+    hist_basis[mk] = 22.0  # Komfort: moderates Tarifwerk → 22% Ø
+    hist_basis[mp] = 8.0   # Premium: neuere Tarife → 8% Ø
 
-    # Alters-Effekt auf Historie
+    # Alters-Effekt auf historische Anpassungen
+    # Ältere waren länger abhängig → mehr historische Anpassungen
     hist_af = np.ones(n)
-    hist_af[alter < 35] = 0.70
+    hist_af[alter < 35] = 0.70              # Junge: weniger Historie
     hist_af[(alter >= 35) & (alter < 50)] = 0.90
     hist_af[(alter >= 60) & (alter < 70)] = 1.15
     hist_af[(alter >= 70) & (alter < 80)] = 1.30
-    hist_af[alter >= 80] = 1.50
+    hist_af[alter >= 80] = 1.50             # Älteste: maximale Historie
 
-    # Tarif-Effekt: Voll-Tarife historisch stärker betroffen
+    # Tarifart-Effekt: Voll-Tarife waren historisch stärker betroffen
     hist_tf = np.ones(n)
-    hist_tf[tarifart_wahl == "voll"] = 1.20
-    hist_tf[tarifart_wahl == "zahn"] = 0.75
+    hist_tf[tarifart_wahl == "voll"] = 1.20  # Voll +20%
+    hist_tf[tarifart_wahl == "zahn"] = 0.75  # Zahn -25%
 
-    # Korrelation mit aktueller Anpassung (~0.55)
+    # Erzeuge Korrelation zwischen aktueller und historischer Anpassung
+    # Korrelation: 0.55 → moderate positive Abhängigkeit
     korrelation = 0.55
+    # Normalisiere aktuelle Anpassungen auf [0, 1]
     akt_norm = (anp - anp.min()) / (anp.max() - anp.min() + 1e-10)
+    # Unabhängiger log-normal verteilter Zufallsterm
     hist_zuf = rng.lognormal(0, 0.55, size=n)
     hist_zuf_norm = (hist_zuf - hist_zuf.min()) / (hist_zuf.max() - hist_zuf.min() + 1e-10)
+    # Kombiniere mit Gewichtung
     hist_score = korrelation * akt_norm + (1 - korrelation) * hist_zuf_norm
 
+    # Berechne historische Erhöhung
+    # Basis × Altersfaktor × Tarifartfaktor × Zufalls-Score (skaliert [0.2, 1.8])
     erh_hist = hist_basis * hist_af * hist_tf * (0.2 + 1.6 * hist_score)
 
-    # Versicherungsdauer < 3 Jahre: weniger Historie
+    # Spezialbehandlung: Kurze Versicherungsdauern (<3 Jahre)
+    # Neue Versicherte haben weniger historische Anpassungen
     kurz = vd < 3
-    erh_hist[kurz] *= (vd[kurz] / 3.0)
+    erh_hist[kurz] *= (vd[kurz] / 3.0)  # Proportionaler Abschlag
 
-    # Top-Anpassungen: auch historisch stärker betroffen
+    # Spezialbehandlung: Top 5% aktuelle Anpassungen
+    # Diese sind auch historisch besonders betroffen (Risikoverlauf)
     top_anp = anp >= np.percentile(anp, 95)
-    erh_hist[top_anp] *= 1.3
+    erh_hist[top_anp] *= 1.3  # +30% Aufschlag
 
+    # Finales Clipping: 0-80%
     erh_hist = np.clip(np.round(erh_hist, 1), 0.0, 80.0)
 
-    # --- 9. DataFrame ---
+    # --- 9. Konstruiere finales DataFrame mit allen Spalten ---
+    # Kombiniere alle generierten Arrays in strukturiertes DataFrame
+    # Rückgabeformat ist die zentrale Schnittstelle für alle Downstream-Analysen
     print("  Baue DataFrame ...")
     return pd.DataFrame({
         "versicherten_id": [f"V{i:07d}" for i in range(1, n + 1)],
@@ -332,6 +496,32 @@ def erzeuge_bestand(df_tarife, mittlere_anpassung, rng):
 # =============================================================================
 
 def zeige_statistiken(df, df_t, df_ao):
+    """Ausgabe detailliertes Statistik-Report für den Bestand.
+    
+    Präsentiert umfassende Analysen der generierten Versichertendaten:
+    - Deskriptive Statistiken (Anzahl, Alter, Geschlechterverhältnis)
+    - Verteilungskennung der Prämienanpassung (%) und absolut (€)
+    - Historische Anpassungen und Korrelation zur aktuellen Anpassung
+    - Aggregierte Metriken nach Tarifwerk und einzelnem Tarif
+    - Extremfälle (hohe Anpassungen)
+    - Volumen-Metriken (Jahresausgaben)
+    
+    Args:
+        df (pd.DataFrame): Bestandsdaten mit folgenden Spalten:
+            - alter, geschlecht, tarifwerk, erhoehung_prozent,
+            - erhoehung_absolut, erhoehung_historisch_kumuliert,
+            - praemie_alt_monatlich, praemie_neu_monatlich, tarif_id
+        df_t (pd.DataFrame): Tarifstammdaten (wird nur für count verwendet)
+        df_ao (pd.DataFrame): Ausscheideordnung (wird nur für count verwendet)
+    
+    Returns:
+        None (nur Konsolenausgabe)
+    
+    Notes:
+        - P05, P25, P75, P95, P99: Perzentile der Prämienanpassung
+        - Korrelation: Maß für lineare Abhängigkeit (0=unabhängig, 1=perfekt)
+        - Top-5 Tarife: nach durchschnittlicher Erhöhung sortiert
+    """
     print("\n" + "=" * 70)
     print("ZUSAMMENFASSUNG (v4)")
     print("=" * 70)
@@ -404,14 +594,54 @@ def zeige_statistiken(df, df_t, df_ao):
 # =============================================================================
 
 def main():
+    """Hauptprogramm: Orchestriert die Erzeugung aller Mock-Daten.
+    
+    Workflow:
+    1. Parse Kommandozeilen-Argumente
+    2. Initialisiere Zufallsgenerator mit determiniertem Seed
+    3. Erzeuge alle vier Ausgabedateien:
+       a) tarife.csv - Tarifstammdaten
+       b) ausscheideordnung.csv - Sterblichkeit + Stornoquoten
+       c) sterbetafel.csv - (aus PKV-Sterbetafel.csv geladen)
+       d) bestand.csv - 1 Mio. Versicherte mit allen Merkmalen
+    4. Berechne und zeige aggregierte Statistik
+    5. Messe und reporte Ausführungszeit und Dateigröße
+    
+    Kommandozeilen-Argumente:
+        --ausgabeverzeichnis / -o: Zielverzeichnis (default: aktuelles Verzeichnis)
+        --mittlere_anpassung / -m: Target-Durchschnitt für Anpassung in % 
+                                   (default: 30%)
+        --seed / -s: RNG-Seed für Reproduzierbarkeit (default: 42)
+    
+    Returns:
+        None (schreibt CSV-Dateien und Konsolenausgaben)
+    
+    Example:
+        python mock_daten_erzeugen.py -o ./output -m 0.25 -s 123
+    """
     parser = argparse.ArgumentParser(description="Mock-Daten-Generator v4")
-    parser.add_argument("--ausgabeverzeichnis", "-o", default=".")
-    parser.add_argument("--mittlere_anpassung", "-m", type=float, default=MITTLERE_PRAEMIENANPASSUNG)
-    parser.add_argument("--seed", "-s", type=int, default=SEED)
+    parser.add_argument(
+        "--ausgabeverzeichnis", "-o",
+        default=".",
+        help="Zielverzeichnis für CSV-Ausgabedateien (default: aktuelles Verzeichnis)"
+    )
+    parser.add_argument(
+        "--mittlere_anpassung", "-m",
+        type=float,
+        default=MITTLERE_PRAEMIENANPASSUNG,
+        help=f"Mittlere Prämienanpassung als Dezimal (default: {MITTLERE_PRAEMIENANPASSUNG:.1%})"
+    )
+    parser.add_argument(
+        "--seed", "-s",
+        type=int,
+        default=SEED,
+        help=f"RNG-Seed für Reproduzierbarkeit (default: {SEED})"
+    )
     args = parser.parse_args()
 
     ausgabe = args.ausgabeverzeichnis
-    os.makedirs(ausgabe, exist_ok=True)
+    os.makedirs(ausgabe, exist_ok=True)  # Erstelle Verzeichnis falls nicht vorhanden
+    # Initialisiere Zufallsgenerator mit Seed für Reproduzierbarkeit
     rng = np.random.default_rng(args.seed)
 
     print("=" * 70)

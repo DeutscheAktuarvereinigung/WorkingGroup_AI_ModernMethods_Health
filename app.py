@@ -37,6 +37,7 @@ from services.bestandsanalyse import (
 )
 from services.limitierung import (
     berechne_barwertfaktoren as berechne_barwertfaktoren_service,
+    berechne_barwertfaktoren_befristet as berechne_barwertfaktoren_befristet_service,
     berechne_limitierung as berechne_limitierung_service,
     berechne_sensitivitaet as berechne_sensitivitaet_service,
 )
@@ -260,6 +261,10 @@ with tab_bestand:
 def berechne_barwertfaktoren(_ao_hash, df_ao, df_tarife):
     return berechne_barwertfaktoren_service(df_ao, df_tarife)
 
+@st.cache_data(show_spinner="Berechne befristete Barwerte …")
+def berechne_barwertfaktoren_befristet(_ao_hash, df_ao, df_tarife, laufzeit_jahre):
+    return berechne_barwertfaktoren_befristet_service(df_ao, df_tarife, laufzeit_jahre)
+
 @st.cache_data(show_spinner=False)
 def berechne_limitierung(_hash, df, df_bwf, regeln, modus, laufzeit_jahre):
     return berechne_limitierung_service(df, df_bwf, regeln, modus, laufzeit_jahre)
@@ -277,6 +282,7 @@ with tab_limitierung:
         st.session_state.get("df_tarife"),
         GRUPPIER_DIMENSIONEN,
         berechne_barwertfaktoren,
+        berechne_barwertfaktoren_befristet,
         berechne_limitierung,
         berechne_sensitivitaet,
         formatiere_euro,
