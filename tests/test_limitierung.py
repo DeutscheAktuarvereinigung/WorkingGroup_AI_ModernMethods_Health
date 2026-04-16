@@ -1,5 +1,7 @@
 """Tests für services/limitierung.py"""
 
+import logging
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -117,7 +119,8 @@ class TestBerechneLimitierung:
     def test_ergebnis_spalten(self, bestand_klein, barwertfaktoren, regeln_global_30):
         result = berechne_limitierung(bestand_klein, barwertfaktoren, regeln_global_30, "full", 10)
         erwartete = {"erhoehung_limitiert_pct", "erhoehung_limitiert_abs", "praemie_limitiert",
-                     "differenz_monatlich", "einmaleinlage", "limitiert"}
+                     "differenz_monatlich", "einmaleinlage", "limitiert",
+                     "regel_index", "regel_beschreibung"}
         assert erwartete == set(result.columns)
 
     def test_keine_limitierung_bei_hohem_ziel(self, bestand_klein, barwertfaktoren):
@@ -229,6 +232,80 @@ class TestBerechneLimitierung:
         result = berechne_limitierung(df, barwertfaktoren, regeln, "full", 10)
         assert len(result) == 1
         assert result.iloc[0]["einmaleinlage"] == 0.0
+
+    def test_fehlende_barwertfaktoren_warnung(self, bestand_klein, barwertfaktoren, caplog):
+        """Fehlende BWF-Einträge erzeugen eine Warnung im Log."""
+        # Entferne BWF für einen Tarif, damit der Merge NaNs erzeugt
+        bwf_unvollstaendig = barwertfaktoren[barwertfaktoren["tarif_id"] != "CL-AMB"]
+        regeln = [{"ziel_pct": 15.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
+        with caplog.at_level(logging.WARNING, logger="services.limitierung"):
+            result = berechne_limitierung(bestand_klein, bwf_unvollstaendig, regeln, "full", 10)
+        assert any("Barwertfaktoren-Merge" in msg for msg in caplog.messages)
+        # Ergebnis wird trotzdem berechnet (mit 0 für fehlende BWF)
+        assert len(result) == len(bestand_klein)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Regeltracing
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestRegeltracing:
+
+    def test_keine_limitierung_kein_tracing(self, bestand_klein, barwertfaktoren):
+        """Hohes Ziel → kein Versicherter limitiert → alle regel_index = -1."""
+        regeln = [{"ziel_pct": 100.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
+        result = berechne_limitierung(bestand_klein, barwertfaktoren, regeln, "full", 10)
+        assert (result["regel_index"] == -1).all()
+        assert (result["regel_beschreibung"] == "").all()
+
+    def test_globale_regel_tracing(self, bestand_klein, barwertfaktoren):
+        """Globale Regel bei 15% → limitierte erhalten regel_index=0."""
+        regeln = [{"ziel_pct": 15.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
+        result = berechne_limitierung(bestand_klein, barwertfaktoren, regeln, "full", 10)
+        limitierte = result[result["limitiert"]]
+        assert (limitierte["regel_index"] == 0).all()
+        assert all("Regel 1" in b and "Global" in b for b in limitierte["regel_beschreibung"])
+
+    def test_segmentierte_regel_tracing(self, bestand_klein, barwertfaktoren):
+        """Segmentierte Regel → nur ambulante erhalten die Regel-Referenz."""
+        regeln = [{
+            "ziel_pct": 5.0, "ziel_abs": None,
+            "scope_spalte": "tarifart", "scope_werte": ["ambulant"],
+        }]
+        result = berechne_limitierung(bestand_klein, barwertfaktoren, regeln, "full", 10)
+        stationaer_mask = bestand_klein["tarifart"] == "stationaer"
+        assert (result.loc[stationaer_mask.values, "regel_index"] == -1).all()
+
+    def test_mehrere_regeln_letzte_gewinnt(self, bestand_klein, barwertfaktoren):
+        """Global 25% + ambulant 10% → ambulante mit >10% bekommen Regel 2."""
+        regeln = [
+            {"ziel_pct": 25.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None},
+            {"ziel_pct": 10.0, "ziel_abs": None, "scope_spalte": "tarifart", "scope_werte": ["ambulant"]},
+        ]
+        result = berechne_limitierung(bestand_klein, barwertfaktoren, regeln, "full", 10)
+        ambulant_mask = bestand_klein["tarifart"] == "ambulant"
+        ambulant_limitiert = result[ambulant_mask.values & result["limitiert"]]
+        # Ambulante mit >10% werden von Regel 2 (Index 1) begrenzt
+        assert (ambulant_limitiert["regel_index"] == 1).all()
+        assert all("Regel 2" in b for b in ambulant_limitiert["regel_beschreibung"])
+
+    def test_beschreibung_format(self, bestand_klein, barwertfaktoren):
+        """Regel-Beschreibung enthält Zielwerte und Scope."""
+        regeln = [
+            {"ziel_pct": 20.0, "ziel_abs": 50.0, "scope_spalte": None, "scope_werte": None},
+            {"ziel_pct": 10.0, "ziel_abs": None, "scope_spalte": "tarifart", "scope_werte": ["ambulant"]},
+        ]
+        result = berechne_limitierung(bestand_klein, barwertfaktoren, regeln, "full", 10)
+        beschreibungen = set(result.loc[result["limitiert"], "regel_beschreibung"])
+        for b in beschreibungen:
+            assert "Regel" in b
+            assert "≤" in b
+
+    def test_leere_regeln_kein_tracing(self, bestand_klein, barwertfaktoren):
+        result = berechne_limitierung(bestand_klein, barwertfaktoren, [], "full", 10)
+        assert (result["regel_index"] == -1).all()
+        assert (result["regel_beschreibung"] == "").all()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

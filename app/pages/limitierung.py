@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
+from scipy.ndimage import uniform_filter1d
+
 from services.bestandsanalyse import df_hash, formatiere_euro
 from ui.theme import (
     DAV_BLAU_AKZENT,
@@ -30,6 +32,10 @@ def render_limitierung(
     berechne_limitierung,
     berechne_sensitivitaet,
     formatiere_euro,
+    berechne_gitter,
+    berechne_optimale_budgetstufen,
+    finde_knickpunkt,
+    berechne_pareto_front,
 ):
     """
     Rendert den gesamten Tab "Limitierungsrechnung".
@@ -802,14 +808,20 @@ def render_limitierung(
             # --- Gruppierte Analyse ---
             st.markdown("### Detailanalyse nach Limitierung")
 
+            lim_gruppen = {**GRUPPIER_DIMENSIONEN, "Auslösende Regel": "regel_beschreibung"}
             gew_grp_lim = st.multiselect(
-                "Gruppieren nach", list(GRUPPIER_DIMENSIONEN.keys()),
+                "Gruppieren nach", list(lim_gruppen.keys()),
                 default=["Tarifwerk"], key="lim_gruppierung",
             )
-            grp_spalten = [GRUPPIER_DIMENSIONEN[g] for g in gew_grp_lim]
+            grp_spalten = [lim_gruppen[g] for g in gew_grp_lim]
 
             if grp_spalten:
-                df_detail_lim = df_lim_aktuell[grp_spalten + ["versicherten_id"]].copy()
+                df_detail_lim = df_lim_aktuell[
+                    [s for s in grp_spalten if s in df_lim_aktuell.columns] + ["versicherten_id"]
+                ].copy()
+                # Spalten aus dem Limitierungsergebnis hinzufügen
+                if "regel_beschreibung" in grp_spalten:
+                    df_detail_lim["regel_beschreibung"] = res["regel_beschreibung"].values
                 df_detail_lim["erh_vorher_pct"] = df_lim_aktuell["erhoehung_prozent"].values
                 df_detail_lim["erh_nachher_pct"] = res["erhoehung_limitiert_pct"].values
                 df_detail_lim["einmaleinlage"] = res["einmaleinlage"].values
@@ -842,7 +854,8 @@ def render_limitierung(
 
                 # Gruppierungsspalten umbenennen
                 rename = {"tarifwerk": "Tarifwerk", "tarifart": "Tarifart", "tarif_id": "Tarif",
-                          "geschlecht": "Geschlecht", "altersgruppe": "Altersgruppe"}
+                          "geschlecht": "Geschlecht", "altersgruppe": "Altersgruppe",
+                          "regel_beschreibung": "Auslösende Regel"}
                 agg_lim = agg_lim.rename(columns={k: v for k, v in rename.items() if k in agg_lim.columns})
 
                 st.dataframe(
@@ -850,6 +863,245 @@ def render_limitierung(
                     hide_index=True, use_container_width=True,
                     height=min(500, 40 + len(agg_lim) * 35),
                 )
+
+            st.markdown("---")
+
+            # =================================================================
+            # RfB-OPTIMIERER
+            # =================================================================
+            st.markdown("### 🎯 RfB-Optimierer")
+            st.caption("Findet die optimale Kombination aus prozentualem und absolutem Deckel "
+                       "für verschiedene Budget-Stufen. Identifiziert den Knickpunkt, ab dem "
+                       "zusätzliches Budget kaum noch Spitzenreduktion bringt.")
+
+            with st.expander("⚙️ Optimierer konfigurieren & starten", expanded=False):
+
+                opt_c1, opt_c2 = st.columns(2)
+                with opt_c1:
+                    opt_budget_max = st.number_input(
+                        "Maximales Budget (€)", min_value=1_000_000,
+                        value=int(budget), step=1_000_000, format="%d",
+                        key="opt_budget_max",
+                    )
+                    opt_schrittweite = st.number_input(
+                        "Schrittweite Budget (Mio. €)", min_value=1, max_value=50,
+                        value=5, step=1, key="opt_schritt",
+                    )
+
+                with opt_c2:
+                    opt_modus = st.radio(
+                        "Optimierungsmodus",
+                        ["Ausgewogen (Minmax)", "Gewichtet"],
+                        index=0, key="opt_modus",
+                    )
+                    opt_gewicht_pct = 0.5
+                    if "Gewichtet" in opt_modus:
+                        opt_gewicht_pct = st.slider(
+                            "Gewichtung: Prozentual ↔ Absolut",
+                            min_value=0.1, max_value=0.9, value=0.5, step=0.05,
+                            key="opt_gewicht",
+                            help="0.5 = gleichgewichtet. Höher = prozentuale Spitze wichtiger.",
+                        )
+
+                if st.button("🚀 Optimierung starten", type="primary", key="opt_start", use_container_width=True):
+                    with st.spinner("Berechne optimale Kombinationen (kann 1-2 Minuten dauern) …"):
+
+                        erh_pct = df_lim["erhoehung_prozent"].values
+                        erh_abs = df_lim["erhoehung_absolut"].values
+                        praemie_alt_vals = df_lim["praemie_alt_monatlich"].values
+
+                        bwf_merged = df_lim[["tarif_id", "geschlecht", "alter"]].merge(
+                            df_bwf, on=["tarif_id", "geschlecht", "alter"], how="left"
+                        )
+                        bwf_vals = bwf_merged["barwertfaktor"].fillna(0).values
+
+                        df_gitter, gitter_meta = berechne_gitter(
+                            erh_pct, erh_abs, praemie_alt_vals, bwf_vals,
+                            opt_modus, opt_gewicht_pct,
+                        )
+
+                        df_opt = berechne_optimale_budgetstufen(
+                            df_gitter, len(df_lim), opt_budget_max, opt_schrittweite,
+                        )
+
+                        knick_row, knick_gefunden = finde_knickpunkt(df_opt)
+
+                        st.session_state["opt_knick_gefunden"] = knick_gefunden
+                        st.session_state["opt_result"] = df_opt
+                        st.session_state["opt_gitter"] = df_gitter
+                        st.session_state["opt_knick"] = knick_row
+                        st.session_state["opt_umrechnung"] = gitter_meta["umrechnungsfaktor"]
+                        st.session_state["opt_max_pct_vorher"] = gitter_meta["max_pct_vorher"]
+                        st.session_state["opt_max_abs_vorher"] = gitter_meta["max_abs_vorher"]
+                        st.session_state["opt_modus_used"] = opt_modus
+
+            # --- Optimierer-Ergebnisse anzeigen ---
+            df_opt = st.session_state.get("opt_result")
+
+            if df_opt is not None and len(df_opt) > 0:
+                knick_row = st.session_state.get("opt_knick")
+                umrechnung = st.session_state.get("opt_umrechnung", 1)
+                max_pct_v = st.session_state.get("opt_max_pct_vorher", 0)
+                max_abs_v = st.session_state.get("opt_max_abs_vorher", 0)
+
+                # --- Chart 1: Score-Zerlegung ---
+                st.markdown("#### Score-Zerlegung")
+                st.caption("Kombinierter Score und seine Bestandteile der jeweils besten Kombination pro Budget-Stufe.")
+
+                budgets_arr = df_opt["Budget (Mio. €)"].values
+                n_pts = len(budgets_arr)
+                smooth_size = max(3, n_pts // 10)
+
+                df_gitter = st.session_state.get("opt_gitter")
+                best_pct_all = df_gitter["max_pct"].min() if df_gitter is not None else 0
+                best_abs_all = df_gitter["max_abs"].min() if df_gitter is not None else 0
+                norm_pct_r = max(max_pct_v - best_pct_all, 1)
+                norm_abs_r = max(max_abs_v - best_abs_all, 1)
+
+                score_pct_einzel = (max_pct_v - df_opt["Max nachher (%)"].values) / norm_pct_r * 100
+                score_abs_einzel = (max_abs_v - df_opt["Max nachher (€)"].values) / norm_abs_r * 100
+                score_kombi = df_opt["score"].values
+                max_score = score_kombi.max() if score_kombi.max() > 0 else 1
+                score_kombi_pct = score_kombi / max_score * 100
+
+                sc_k = uniform_filter1d(score_kombi_pct.astype(float), size=smooth_size)
+                sc_p = uniform_filter1d(score_pct_einzel.astype(float), size=smooth_size)
+                sc_a = uniform_filter1d(score_abs_einzel.astype(float), size=smooth_size)
+
+                fig_sc = go.Figure()
+                fig_sc.add_trace(go.Scatter(
+                    x=budgets_arr, y=sc_k, mode="lines", name="Kombinierter Score",
+                    line=dict(color=DAV_GRUEN, width=3),
+                    hovertemplate="Budget: %{x:.0f} Mio. €<br>Komb.: %{y:.1f}%<br>Deckel: %{customdata[0]:.1f}%/%{customdata[1]:.0f}€<extra></extra>",
+                    customdata=np.column_stack([df_opt["Opt. %-Deckel"].values, df_opt["Opt. €-Deckel"].values]),
+                ))
+                fig_sc.add_trace(go.Scatter(
+                    x=budgets_arr, y=sc_p, mode="lines", name="Score prozentual",
+                    line=dict(color=DAV_BLAU_AKZENT, width=2, dash="dash"),
+                    hovertemplate="Budget: %{x:.0f} Mio. €<br>Score %: %{y:.1f}%<extra></extra>",
+                ))
+                fig_sc.add_trace(go.Scatter(
+                    x=budgets_arr, y=sc_a, mode="lines", name="Score absolut",
+                    line=dict(color=DAV_ORANGE, width=2, dash="dot"),
+                    hovertemplate="Budget: %{x:.0f} Mio. €<br>Score €: %{y:.1f}%<extra></extra>",
+                ))
+                fig_sc.update_layout(
+                    **PLOTLY_LAYOUT, title="Score-Zerlegung: Kombiniert vs. Einzel-Scores",
+                    xaxis_title="Budget (Mio. €)", yaxis_title="Score (% des Maximums)", height=420,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0.5, xanchor="center"),
+                )
+                fig_sc.update_xaxes(gridcolor="#eee")
+                fig_sc.update_yaxes(gridcolor="#eee", range=[0, 105])
+                st.plotly_chart(fig_sc, use_container_width=True)
+
+                # --- Chart 2: Tatsächliche Maxima ---
+                st.markdown("#### Maximale Erhöhung nach Limitierung")
+                mp = uniform_filter1d(df_opt["Max nachher (%)"].values.astype(float), size=smooth_size)
+                ma = uniform_filter1d(df_opt["Max nachher (€)"].values.astype(float), size=smooth_size)
+
+                fig_max = go.Figure()
+                fig_max.add_trace(go.Scatter(
+                    x=budgets_arr, y=mp, mode="lines", name="Max Erhöhung (%)",
+                    line=dict(color=DAV_BLAU_AKZENT, width=3),
+                    hovertemplate="Budget: %{x:.0f} Mio. €<br>Max: %{y:.1f}%<br>Deckel: %{customdata[0]:.1f}%/%{customdata[1]:.0f}€<extra></extra>",
+                    customdata=np.column_stack([df_opt["Opt. %-Deckel"].values, df_opt["Opt. €-Deckel"].values]),
+                ))
+                fig_max.add_trace(go.Scatter(
+                    x=budgets_arr, y=ma, mode="lines", name="Max Erhöhung (€/Mon)",
+                    line=dict(color=DAV_ORANGE, width=3), yaxis="y2",
+                    hovertemplate="Budget: %{x:.0f} Mio. €<br>Max: %{y:.0f} €/Mon<extra></extra>",
+                ))
+                fig_max.update_layout(
+                    **PLOTLY_LAYOUT, title="Maximale Erhöhung in Abhängigkeit der RfB-Mittel",
+                    xaxis_title="Budget (Mio. €)", yaxis_title="Max. Erhöhung (%)",
+                    yaxis2=dict(title="Max. Erhöhung (€/Mon)", overlaying="y", side="right", showgrid=False),
+                    height=420, legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0.5, xanchor="center"),
+                )
+                fig_max.update_xaxes(gridcolor="#eee")
+                fig_max.update_yaxes(gridcolor="#eee")
+                st.plotly_chart(fig_max, use_container_width=True)
+
+                # --- Detail-Tabelle ---
+                with st.expander("📋 Detail pro Budget-Stufe"):
+                    dod = df_opt.copy()
+                    for c in ["Max nachher (%)", "Anteil lim. (%)", "RfB-Bedarf (Mio. €)", "Budget (Mio. €)"]:
+                        if c in dod.columns:
+                            dod[c] = dod[c].round(1)
+                    dod["Opt. %-Deckel"] = dod["Opt. %-Deckel"].round(1)
+                    dod["Opt. €-Deckel"] = dod["Opt. €-Deckel"].round(0)
+                    dod["Max nachher (€)"] = dod["Max nachher (€)"].round(0)
+                    acols = [c for c in dod.columns if c not in ("score", "grenznutzen")]
+                    st.dataframe(dod[acols], hide_index=True, use_container_width=True)
+
+                # --- Trade-off: Pareto-Front ---
+                st.markdown("#### Trade-off: Pareto-Front bei festem Budget")
+                st.caption("Nur Pareto-optimale Kombinationen: Kein Deckel kann gesenkt werden "
+                           "ohne den anderen anzuheben. Farbe = Score.")
+
+                budget_optionen = sorted(df_opt["Budget (Mio. €)"].unique())
+                aktueller_bedarf_mio = bedarf / 1e6
+                max_slider = max(aktueller_bedarf_mio, budget_val / 1e6)
+                budget_optionen = [b for b in budget_optionen if b <= max_slider]
+                if not budget_optionen:
+                    budget_optionen = sorted(df_opt["Budget (Mio. €)"].unique())
+                default_to = min(budget_optionen, key=lambda x: abs(x - aktueller_bedarf_mio))
+                to_budget = st.select_slider(
+                    "Budget (Mio. €)", options=budget_optionen,
+                    value=default_to, key="to_budget",
+                )
+                modus_used = st.session_state.get("opt_modus_used", "")
+                if "Minmax" in modus_used:
+                    st.caption("**Score (Minmax):** Minimum der normalisierten Verbesserung in % und €.")
+                else:
+                    st.caption(f"**Score (Gewichtet):** 1 pp ≈ {umrechnung:.1f} €/Mon.")
+
+                if df_gitter is not None:
+                    pdf = berechne_pareto_front(df_gitter, to_budget * 1e6)
+
+                    if len(pdf) > 0:
+                        best_to = pdf.loc[pdf["score"].idxmax()]
+                        fig_to = go.Figure()
+                        fig_to.add_trace(go.Scatter(
+                            x=pdf["pct_cap"], y=pdf["abs_cap"],
+                            mode="lines+markers",
+                            line=dict(color="rgba(0,120,200,0.3)", width=1),
+                            marker=dict(
+                                size=10, color=pdf["score"],
+                                colorscale=[[0, "#F0F0F0"], [0.5, DAV_BLAU_AKZENT], [1, DAV_GRUEN]],
+                                colorbar=dict(title="Score"),
+                                line=dict(width=1, color="white"),
+                            ),
+                            customdata=np.column_stack([
+                                pdf["max_pct"].values, pdf["max_abs"].values,
+                                pdf["n_lim"].values, pdf["rfb"].values / 1e6, pdf["score"].values,
+                            ]),
+                            hovertemplate=(
+                                "%-Deckel: %{x:.1f}%<br>€-Deckel: %{y:.0f}€<br><br>"
+                                "Score: %{customdata[4]:.3f}<br>RfB: %{customdata[3]:.1f} Mio. €<br>"
+                                "Max nachher: %{customdata[0]:.1f}% / %{customdata[1]:.0f}€<br>"
+                                "Limitierte: %{customdata[2]:,.0f}<extra></extra>"
+                            ),
+                            showlegend=False,
+                        ))
+                        fig_to.add_trace(go.Scatter(
+                            x=[best_to["pct_cap"]], y=[best_to["abs_cap"]],
+                            mode="markers+text",
+                            marker=dict(size=18, color=DAV_GRUEN, symbol="star", line=dict(width=2, color="white")),
+                            text=[f"★ {best_to['pct_cap']:.1f}% / {best_to['abs_cap']:.0f}€"],
+                            textposition="top center",
+                            textfont=dict(size=11, color=DAV_BLAU_DUNKEL),
+                            showlegend=False,
+                        ))
+                        fig_to.update_layout(
+                            **PLOTLY_LAYOUT, title=f"Pareto-Front bei ~{to_budget:.0f} Mio. € (±5%)",
+                            xaxis_title="Prozentualer Deckel (%)", yaxis_title="Absoluter Deckel (€/Mon)",
+                            height=480,
+                        )
+                        fig_to.update_xaxes(gridcolor="#eee")
+                        fig_to.update_yaxes(gridcolor="#eee")
+                        st.plotly_chart(fig_to, use_container_width=True)
+                    else:
+                        st.info("Keine Kombinationen in diesem Budget-Bereich.")
 
             st.markdown("---")
 
@@ -861,6 +1113,8 @@ def render_limitierung(
                 df_export["praemie_limitiert"] = res["praemie_limitiert"].values
                 df_export["einmaleinlage"] = res["einmaleinlage"].values
                 df_export["limitiert"] = res["limitiert"].values
+                df_export["regel_index"] = res["regel_index"].values
+                df_export["regel_beschreibung"] = res["regel_beschreibung"].values
 
                 st.info(f"{len(df_export):,} Zeilen mit Limitierungsergebnis.")
                 if st.button("CSV erzeugen", key="lim_csv"):

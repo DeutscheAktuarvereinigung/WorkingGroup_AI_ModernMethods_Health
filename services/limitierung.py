@@ -1,5 +1,9 @@
+import logging
+
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def berechne_barwertfaktoren(df_ao: pd.DataFrame, df_tarife: pd.DataFrame) -> pd.DataFrame:
@@ -34,6 +38,7 @@ def berechne_barwertfaktoren(df_ao: pd.DataFrame, df_tarife: pd.DataFrame) -> pd
         berechnet: ax = Σ v^t * Π(1 - q_x+t)
         wobei v = 1 / (1 + Rechnungszins) der Diskontfaktor ist.
     """
+    logger.info("Berechne Barwertfaktoren: %d Tarife, %d AO-Einträge", len(df_tarife), len(df_ao))
     ergebnisse = []
 
     # Iteriere über alle Tarife
@@ -145,6 +150,34 @@ def berechne_barwertfaktoren_befristet(df_ao: pd.DataFrame, df_tarife: pd.DataFr
     return pd.DataFrame(ergebnisse)
 
 
+def _erzeuge_regel_beschreibungen(regeln: list) -> list[str]:
+    """Erzeugt lesbare Labels für jede Regel, z.B. 'Regel 1: Global ≤ 25% / ≤ 50 €'."""
+    beschreibungen = []
+    for i, regel in enumerate(regeln):
+        ziel_pct = regel.get("ziel_pct")
+        ziel_abs = regel.get("ziel_abs")
+        scope_spalte = regel.get("scope_spalte")
+        scope_werte = regel.get("scope_werte")
+
+        teile = []
+        if ziel_pct is not None:
+            teile.append(f"≤ {ziel_pct:g}%")
+        if ziel_abs is not None:
+            teile.append(f"≤ {ziel_abs:g} €")
+        ziel_text = " / ".join(teile) if teile else "–"
+
+        if scope_spalte and scope_werte:
+            werte_text = ", ".join(str(w) for w in scope_werte[:3])
+            if len(scope_werte) > 3:
+                werte_text += f" (+{len(scope_werte) - 3})"
+            scope_text = f"{scope_spalte}={werte_text}"
+        else:
+            scope_text = "Global"
+
+        beschreibungen.append(f"Regel {i + 1}: {scope_text} {ziel_text}")
+    return beschreibungen
+
+
 def berechne_limitierung(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln, modus, laufzeit_jahre) -> pd.DataFrame:
     """
     Berechnet limitierte (begrenzte) Prämiensteigerungen basierend auf definierten Limitierungsregeln.
@@ -181,6 +214,10 @@ def berechne_limitierung(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln, modus, 
             - einmaleinlage: Erforderliche Einmaleinlage (€)
             - limitiert: Boolean-Flag, ob Versicherte limitiert wurden
     """
+    logger.info(
+        "Berechne Limitierung: %d Versicherte, %d Regeln, Modus=%s",
+        len(df), len(regeln), modus,
+    )
     n = len(df)
     
     # Speichere ursprüngliche Steigerungen zur späteren Vergleichbarkeit
@@ -192,8 +229,11 @@ def berechne_limitierung(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln, modus, 
     erh_pct_lim = erh_pct_orig.copy()
     erh_abs_lim = erh_abs_orig.copy()
 
+    # Regeltracing: Welche Regel hat die Limitierung ausgelöst?
+    regel_index = np.full(n, -1, dtype=int)
+
     # Wende alle definierten Limitierungsregeln nacheinander an
-    for regel in regeln:
+    for ri, regel in enumerate(regeln):
         ziel_pct = regel.get("ziel_pct")  # Ziel für prozentuale Steigerung
         ziel_abs = regel.get("ziel_abs")  # Ziel für absolute Steigerung
         scope_spalte = regel.get("scope_spalte")  # Spalte für Segmentierung (None = global)
@@ -202,6 +242,10 @@ def berechne_limitierung(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln, modus, 
         # Überspringe Regeln ohne Zielwerte
         if ziel_pct is None and ziel_abs is None:
             continue
+
+        # Snapshot vor Regelanwendung für Tracing
+        erh_pct_vor = erh_pct_lim.copy()
+        erh_abs_vor = erh_abs_lim.copy()
 
         # Bestimme Maske: Welche Versicherten sind von dieser Regel betroffen?
         if scope_spalte and scope_werte:
@@ -221,10 +265,15 @@ def berechne_limitierung(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln, modus, 
             cap_abs = np.where(maske & (erh_abs_lim > ziel_abs), ziel_abs, erh_abs_lim)
             erh_abs_lim = np.minimum(erh_abs_lim, cap_abs)
 
+        # Tracing: Markiere Versicherte, deren Werte durch diese Regel gesenkt wurden
+        wurde_gesenkt = (erh_pct_vor > erh_pct_lim + 0.001) | (erh_abs_vor > erh_abs_lim + 0.001)
+        regel_index[wurde_gesenkt] = ri
+
     # Konsistenzcheck: Stelle sicher, dass absolute und prozentuale Steigerungen kohärent sind
     erh_abs_aus_pct = praemie_alt * erh_pct_lim / 100.0  # Von prozentual abgeleiteter Betrag
     erh_abs_lim = np.minimum(erh_abs_lim, erh_abs_aus_pct)  # Nutze das kleinere der beiden
-    erh_pct_lim = np.where(praemie_alt > 0, erh_abs_lim / praemie_alt * 100.0, 0.0)  # Passe prozentual an
+    with np.errstate(divide="ignore", invalid="ignore"):
+        erh_pct_lim = np.where(praemie_alt > 0, erh_abs_lim / praemie_alt * 100.0, 0.0)
 
     # Berechne limitierte neue Prämien
     praemie_lim = np.round(praemie_alt + erh_abs_lim, 2)
@@ -237,7 +286,25 @@ def berechne_limitierung(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln, modus, 
     bwf_merged = df[["tarif_id", "geschlecht", "alter"]].merge(
         df_bwf, on=["tarif_id", "geschlecht", "alter"], how="left"
     )
-    bwf_werte = bwf_merged["barwertfaktor"].fillna(0).values  # Fehlende Barwertfaktoren = 0
+
+    # Validierung: Fehlende Barwertfaktoren erkennen und warnen
+    fehlende_bwf = bwf_merged["barwertfaktor"].isna()
+    anzahl_fehlend = int(fehlende_bwf.sum())
+    if anzahl_fehlend > 0:
+        betroffene = df.loc[fehlende_bwf.values, ["tarif_id", "geschlecht", "alter"]].drop_duplicates()
+        logger.warning(
+            "Barwertfaktoren-Merge: %d von %d Versicherten (%d eindeutige Kombinationen) "
+            "haben keinen passenden Barwertfaktor. "
+            "Fehlende Kombinationen (tarif_id, geschlecht, alter): %s. "
+            "Einmaleinlagen werden für diese Versicherten auf 0 gesetzt — "
+            "der RfB-Bedarf wird dadurch systematisch unterschätzt!",
+            anzahl_fehlend,
+            len(df),
+            len(betroffene),
+            betroffene.head(10).to_dict("records"),
+        )
+
+    bwf_werte = bwf_merged["barwertfaktor"].fillna(0).values
 
     # Konvertiere monatliche Entlastungen in Einmaleinlagen
     # Formel: Monatlich * 12 Monate * Barwertfaktor
@@ -246,6 +313,20 @@ def berechne_limitierung(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln, modus, 
     # Flag: War diese Versicherte limitiert (Entlastung > 0,01 €)?
     limitiert = diff_monatlich > 0.01
 
+    # Regeltracing: Lesbare Beschreibung erzeugen
+    regel_beschreibungen = _erzeuge_regel_beschreibungen(regeln)
+    regel_beschreibung = np.where(
+        regel_index >= 0,
+        np.array([regel_beschreibungen[i] if i >= 0 else "" for i in regel_index]),
+        "",
+    )
+
+    logger.info(
+        "Limitierung abgeschlossen: %d von %d Versicherten limitiert, "
+        "RfB-Bedarf=%.2f Mio. €",
+        int(limitiert.sum()), n, einmaleinlage.sum() / 1e6,
+    )
+
     return pd.DataFrame({
         "erhoehung_limitiert_pct": np.round(erh_pct_lim, 2),
         "erhoehung_limitiert_abs": np.round(erh_abs_lim, 2),
@@ -253,6 +334,8 @@ def berechne_limitierung(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln, modus, 
         "differenz_monatlich": np.round(diff_monatlich, 2),
         "einmaleinlage": einmaleinlage,
         "limitiert": limitiert,
+        "regel_index": regel_index,
+        "regel_beschreibung": regel_beschreibung,
     })
 
 

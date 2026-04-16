@@ -9,10 +9,19 @@ Nutzung:
   streamlit run app.py
 """
 
+import logging
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+
+# ── Logging-Konfiguration ───────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 from ui.theme import (
     DAV_BLAU_AKZENT,
@@ -40,6 +49,12 @@ from services.limitierung import (
     berechne_barwertfaktoren_befristet as berechne_barwertfaktoren_befristet_service,
     berechne_limitierung as berechne_limitierung_service,
     berechne_sensitivitaet as berechne_sensitivitaet_service,
+)
+from services.optimierung import (
+    berechne_gitter as berechne_gitter_service,
+    berechne_optimale_budgetstufen as berechne_optimale_budgetstufen_service,
+    finde_knickpunkt as finde_knickpunkt_service,
+    berechne_pareto_front as berechne_pareto_front_service,
 )
 from app.pages import bestandsanalyse, limitierung
 
@@ -75,9 +90,10 @@ def _farb_map_dynamisch(df, spalte):
     return farb_map_dynamisch_service(df, spalte, PALETTE_GROSS)
 
 @st.cache_data(show_spinner="Lade Daten …")
-def lade_csv(datei, name: str) -> pd.DataFrame:
+def lade_csv(datei, name: str):
     try:
-        return lade_csv_service(datei, name)
+        df, warnungen = lade_csv_service(datei, name)
+        return df, warnungen
     except ValueError as exc:
         st.error(str(exc))
         st.stop()
@@ -120,11 +136,18 @@ with st.sidebar:
         pfad = st.text_input("Verzeichnis", value="./output_daten")
         if st.button("Daten laden", type="primary", use_container_width=True):
             try:
-                st.session_state["df_bestand"] = lade_csv(f"{pfad}/bestand.csv", "bestand")
-                st.session_state["df_tarife"] = lade_csv(f"{pfad}/tarife.csv", "tarife")
-                st.session_state["df_ao"] = lade_csv(f"{pfad}/ausscheideordnung.csv", "ao")
+                df_b, w_b = lade_csv(f"{pfad}/bestand.csv", "bestand")
+                df_t, w_t = lade_csv(f"{pfad}/tarife.csv", "tarife")
+                df_a, w_a = lade_csv(f"{pfad}/ausscheideordnung.csv", "ao")
+                st.session_state["df_bestand"] = df_b
+                st.session_state["df_tarife"] = df_t
+                st.session_state["df_ao"] = df_a
                 st.session_state.pop("df_gefiltert", None)
-                st.success(f"✓ {len(st.session_state["df_bestand"]):,} Versicherte geladen")
+                st.success(f"✓ {len(df_b):,} Versicherte geladen")
+                alle_warnungen = w_b + w_t + w_a
+                for w in alle_warnungen:
+                    st.warning(f"⚠️ {w}")
+                logger.info("Daten geladen: %d Versicherte, %d Warnungen", len(df_b), len(alle_warnungen))
             except FileNotFoundError as e:
                 st.error(f"Datei nicht gefunden: {e}")
             except Exception as e:
@@ -134,11 +157,18 @@ with st.sidebar:
         f_t = st.file_uploader("tarife.csv", type="csv", key="up_t")
         f_a = st.file_uploader("ausscheideordnung.csv", type="csv", key="up_a")
         if f_b and f_t and f_a:
-            st.session_state["df_bestand"] = lade_csv(f_b, "bestand")
-            st.session_state["df_tarife"] = lade_csv(f_t, "tarife")
-            st.session_state["df_ao"] = lade_csv(f_a, "ao")
+            df_b, w_b = lade_csv(f_b, "bestand")
+            df_t, w_t = lade_csv(f_t, "tarife")
+            df_a, w_a = lade_csv(f_a, "ao")
+            st.session_state["df_bestand"] = df_b
+            st.session_state["df_tarife"] = df_t
+            st.session_state["df_ao"] = df_a
             st.session_state.pop("df_gefiltert", None)
-            st.success(f"✓ {len(st.session_state["df_bestand"]):,} Versicherte geladen")
+            st.success(f"✓ {len(df_b):,} Versicherte geladen")
+            alle_warnungen = w_b + w_t + w_a
+            for w in alle_warnungen:
+                st.warning(f"⚠️ {w}")
+            logger.info("Daten geladen (Upload): %d Versicherte, %d Warnungen", len(df_b), len(alle_warnungen))
 
     df_bestand = st.session_state.get("df_bestand")
 
@@ -273,6 +303,19 @@ def berechne_limitierung(_hash, df, df_bwf, regeln, modus, laufzeit_jahre):
 def berechne_sensitivitaet(_hash, df, df_bwf, regeln_basis, modus, laufzeit):
     return berechne_sensitivitaet_service(df, df_bwf, regeln_basis, modus, laufzeit)
 
+@st.cache_data(show_spinner="Berechne Optimierungsgitter …")
+def berechne_gitter(erh_pct, erh_abs, praemie_alt, bwf_vals, opt_modus, opt_gewicht_pct):
+    return berechne_gitter_service(erh_pct, erh_abs, praemie_alt, bwf_vals, opt_modus, opt_gewicht_pct)
+
+def berechne_optimale_budgetstufen(df_gitter, n_versicherte, budget_max, schrittweite_mio):
+    return berechne_optimale_budgetstufen_service(df_gitter, n_versicherte, budget_max, schrittweite_mio)
+
+def finde_knickpunkt(df_opt):
+    return finde_knickpunkt_service(df_opt)
+
+def berechne_pareto_front(df_gitter, budget_eur):
+    return berechne_pareto_front_service(df_gitter, budget_eur)
+
 
 with tab_limitierung:
     limitierung.render_limitierung(
@@ -286,4 +329,8 @@ with tab_limitierung:
         berechne_limitierung,
         berechne_sensitivitaet,
         formatiere_euro,
+        berechne_gitter,
+        berechne_optimale_budgetstufen,
+        finde_knickpunkt,
+        berechne_pareto_front,
     )

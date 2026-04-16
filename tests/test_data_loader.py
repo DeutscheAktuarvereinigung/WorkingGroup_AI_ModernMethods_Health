@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from services.data_loader import erzeuge_altersgruppen, lade_csv
+from services.data_loader import erzeuge_altersgruppen, lade_csv, _validiere_bestand
 
 
 # ── erzeuge_altersgruppen ────────────────────────────────────────────────────
@@ -65,8 +65,9 @@ class TestLadeCsv:
         buf.seek(0)
         return buf
 
-    def test_bestand_erfolgreich(self):
-        csv = self._make_csv({
+    def _bestand_daten(self, **overrides):
+        """Erzeugt gültige Bestandsdaten mit optionalen Overrides."""
+        daten = {
             "versicherten_id": ["V1", "V2"],
             "alter": [30, 50],
             "geschlecht": ["M", "W"],
@@ -79,10 +80,16 @@ class TestLadeCsv:
             "erhoehung_prozent": [10, 10],
             "alterungsrueckstellung": [5000, 10000],
             "versicherungsdauer_jahre": [5, 10],
-        })
-        df = lade_csv(csv, "bestand")
+        }
+        daten.update(overrides)
+        return daten
+
+    def test_bestand_erfolgreich(self):
+        csv = self._make_csv(self._bestand_daten())
+        df, warnungen = lade_csv(csv, "bestand")
         assert "altersgruppe" in df.columns
         assert len(df) == 2
+        assert isinstance(warnungen, list)
 
     def test_bestand_fehlende_spalte(self):
         csv = self._make_csv({"versicherten_id": ["V1"], "alter": [30]})
@@ -91,23 +98,114 @@ class TestLadeCsv:
 
     def test_nicht_bestand_kein_check(self):
         csv = self._make_csv({"x": [1], "y": [2]})
-        df = lade_csv(csv, "tarife")
+        df, warnungen = lade_csv(csv, "sonstige")
         assert list(df.columns) == ["x", "y"]
+        assert warnungen == []
 
     def test_altersgruppen_zuordnung(self):
-        csv = self._make_csv({
-            "versicherten_id": ["V1"],
-            "alter": [42],
-            "geschlecht": ["M"],
-            "tarifwerk": ["Classic"],
-            "tarif_id": ["CL-AMB"],
-            "tarifart": ["ambulant"],
-            "praemie_alt_monatlich": [200],
-            "praemie_neu_monatlich": [220],
-            "erhoehung_absolut": [20],
-            "erhoehung_prozent": [10],
-            "alterungsrueckstellung": [5000],
-            "versicherungsdauer_jahre": [5],
-        })
-        df = lade_csv(csv, "bestand")
+        csv = self._make_csv(self._bestand_daten(
+            versicherten_id=["V1"], alter=[42], geschlecht=["M"],
+            tarifwerk=["Classic"], tarif_id=["CL-AMB"], tarifart=["ambulant"],
+            praemie_alt_monatlich=[200], praemie_neu_monatlich=[220],
+            erhoehung_absolut=[20], erhoehung_prozent=[10],
+            alterungsrueckstellung=[5000], versicherungsdauer_jahre=[5],
+        ))
+        df, _ = lade_csv(csv, "bestand")
         assert df.iloc[0]["altersgruppe"] == "40-49"
+
+
+# ── Datenvalidierung ────────────────────────────────────────────────────────
+
+
+class TestValidierung:
+
+    def _bestand_df(self, **overrides):
+        daten = {
+            "versicherten_id": ["V1", "V2"],
+            "alter": [30, 50],
+            "geschlecht": ["M", "W"],
+            "tarifwerk": ["Classic", "Komfort"],
+            "tarif_id": ["CL-AMB", "KO-AMB"],
+            "tarifart": ["ambulant", "ambulant"],
+            "praemie_alt_monatlich": [200.0, 300.0],
+            "praemie_neu_monatlich": [220.0, 330.0],
+            "erhoehung_absolut": [20.0, 30.0],
+            "erhoehung_prozent": [10.0, 10.0],
+            "alterungsrueckstellung": [5000.0, 10000.0],
+            "versicherungsdauer_jahre": [5, 10],
+        }
+        daten.update(overrides)
+        return pd.DataFrame(daten)
+
+    def test_gueltiger_bestand_keine_fehler(self):
+        df = self._bestand_df()
+        warnungen = _validiere_bestand(df)
+        assert isinstance(warnungen, list)
+
+    def test_nicht_numerische_spalte(self):
+        df = self._bestand_df(alter=["dreissig", "fuenfzig"])
+        with pytest.raises(ValueError, match="numerisch"):
+            _validiere_bestand(df)
+
+    def test_nan_in_kritischer_spalte(self):
+        df = self._bestand_df(alter=[30, np.nan])
+        with pytest.raises(ValueError, match="fehlende Werte"):
+            _validiere_bestand(df)
+
+    def test_alter_ausserhalb_bereich(self):
+        df = self._bestand_df(alter=[30, 150])
+        with pytest.raises(ValueError, match="alter"):
+            _validiere_bestand(df)
+
+    def test_negative_praemie(self):
+        df = self._bestand_df(praemie_alt_monatlich=[-100.0, 300.0])
+        with pytest.raises(ValueError, match="praemie_alt_monatlich"):
+            _validiere_bestand(df)
+
+    def test_negative_praemie_neu(self):
+        df = self._bestand_df(praemie_neu_monatlich=[220.0, -10.0])
+        with pytest.raises(ValueError, match="praemie_neu_monatlich"):
+            _validiere_bestand(df)
+
+    def test_negative_versicherungsdauer(self):
+        df = self._bestand_df(versicherungsdauer_jahre=[5, -1])
+        with pytest.raises(ValueError, match="versicherungsdauer_jahre"):
+            _validiere_bestand(df)
+
+    def test_duplikate_warnung(self):
+        df = self._bestand_df(versicherten_id=["V1", "V1"])
+        warnungen = _validiere_bestand(df)
+        assert any("doppelte" in w for w in warnungen)
+
+    def test_unbekanntes_geschlecht_warnung(self):
+        df = self._bestand_df(geschlecht=["M", "X"])
+        warnungen = _validiere_bestand(df)
+        assert any("Geschlechts-Codes" in w for w in warnungen)
+
+    def test_negative_alterungsrueckstellung_warnung(self):
+        df = self._bestand_df(alterungsrueckstellung=[-100.0, 10000.0])
+        warnungen = _validiere_bestand(df)
+        assert any("alterungsrueckstellung" in w for w in warnungen)
+
+    def test_inkonsistente_erhoehung_warnung(self):
+        df = self._bestand_df(
+            praemie_alt_monatlich=[200.0, 300.0],
+            praemie_neu_monatlich=[220.0, 330.0],
+            erhoehung_absolut=[99.0, 30.0],  # V1: 99 statt 20
+        )
+        warnungen = _validiere_bestand(df)
+        assert any("erhoehung_absolut" in w for w in warnungen)
+
+    def test_tarife_fehlende_spalte(self):
+        csv_buf = io.StringIO()
+        pd.DataFrame({"nur_eine_spalte": [1]}).to_csv(csv_buf, sep=";", index=False)
+        csv_buf.seek(0)
+        with pytest.raises(ValueError, match="Tarife.*Fehlende Spalten"):
+            lade_csv(csv_buf, "tarife")
+
+    def test_ao_fehlende_spalte(self):
+        csv_buf = io.StringIO()
+        pd.DataFrame({"nur_eine_spalte": [1]}).to_csv(csv_buf, sep=";", index=False)
+        csv_buf.seek(0)
+        with pytest.raises(ValueError, match="Ausscheideordnung.*Fehlende Spalten"):
+            lade_csv(csv_buf, "ao")
