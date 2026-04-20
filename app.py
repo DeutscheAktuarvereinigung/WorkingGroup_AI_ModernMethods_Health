@@ -16,6 +16,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 # ── Logging-Konfiguration ───────────────────────────────────────────────────
+# Ausgabe auf INFO-Level mit Zeitstempel, Level, Modulname und Meldung
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
@@ -23,39 +24,47 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ── UI-Theme und Farbpalette der DAV ────────────────────────────────────────
 from ui.theme import (
-    DAV_BLAU_AKZENT,
-    DAV_BLAU_DUNKEL,
-    DAV_GRUEN,
-    DAV_ORANGE,
-    PALETTE_GROSS,
-    PLOTLY_LAYOUT,
-    apply_theme,
-    get_logo_src,
+    DAV_BLAU_AKZENT,    # Akzentfarbe (hellblau)
+    DAV_BLAU_DUNKEL,    # Dunkles DAV-Blau (Hintergrund/Header)
+    DAV_GRUEN,          # Grün für positive Kennzahlen
+    DAV_ORANGE,         # Orange für Warnhinweise
+    PALETTE_GROSS,      # Erweiterte Farbpalette für Diagramme
+    PLOTLY_LAYOUT,      # Standardlayout für alle Plotly-Charts
+    apply_theme,        # Wendet globales CSS-Theme auf Streamlit an
+    get_logo_src,       # Gibt das DAV-Logo als Base64-Data-URI zurück
 )
-from services.data_loader import lade_csv as lade_csv_service
+
+# ── Service-Importe (Business-Logik, von UI getrennt) ───────────────────────
+from services.data_loader import lade_csv as lade_csv_service   # CSV-Parsing und Validierung
+
 from services.bestandsanalyse import (
-    berechne_hist_daten as berechne_hist_daten_service,
-    berechne_interaktive_statistik as berechne_interaktive_statistik_service,
-    berechne_kpis as berechne_kpis_service,
-    berechne_treemap_daten as berechne_treemap_daten_service,
-    df_hash,
-    farb_map_dynamisch as farb_map_dynamisch_service,
-    formatiere_euro,
-    geschlecht_label,
+    berechne_hist_daten as berechne_hist_daten_service,                         # Histogramm-Rohdaten
+    berechne_interaktive_statistik as berechne_interaktive_statistik_service,   # Gruppenstatistiken
+    berechne_kpis as berechne_kpis_service,                                     # Kennzahlen (KPIs)
+    berechne_treemap_daten as berechne_treemap_daten_service,                   # Daten für Treemap-Chart
+    df_hash,            # Erzeugt Hash-Wert eines DataFrames für st.cache_data
+    farb_map_dynamisch as farb_map_dynamisch_service,   # Dynamische Farb-Zuweisung je Spalte
+    formatiere_euro,    # Hilfsfunktion: Zahl → "1.234,56 €"
+    geschlecht_label,   # Hilfsfunktion: Codierwert → lesbarer Text (z. B. "1" → "Männlich")
 )
+
 from services.limitierung import (
-    berechne_barwertfaktoren as berechne_barwertfaktoren_service,
-    berechne_barwertfaktoren_befristet as berechne_barwertfaktoren_befristet_service,
-    berechne_limitierung as berechne_limitierung_service,
-    berechne_sensitivitaet as berechne_sensitivitaet_service,
+    berechne_barwertfaktoren as berechne_barwertfaktoren_service,                       # Leibrentenbarwerte (unbefristet)
+    berechne_barwertfaktoren_befristet as berechne_barwertfaktoren_befristet_service,   # Barwerte mit festem Zeithorizont
+    berechne_limitierung as berechne_limitierung_service,       # Kernrechnung der Limitierung
+    berechne_sensitivitaet as berechne_sensitivitaet_service,   # Sensitivitätsanalyse über Parameterbereich
 )
+
 from services.optimierung import (
-    berechne_gitter as berechne_gitter_service,
-    berechne_optimale_budgetstufen as berechne_optimale_budgetstufen_service,
-    finde_knickpunkt as finde_knickpunkt_service,
-    berechne_pareto_front as berechne_pareto_front_service,
+    berechne_gitter as berechne_gitter_service,                                 # 2-D Parametergitter (Erhöhung % × €)
+    berechne_optimale_budgetstufen as berechne_optimale_budgetstufen_service,   # Pareto-optimale Budgetstufen
+    finde_knickpunkt as finde_knickpunkt_service,       # Knickpunkt auf der Pareto-Front
+    berechne_pareto_front as berechne_pareto_front_service,     # Pareto-Front für gegebenes Budget
 )
+
+# ── Seiten-Module (UI-Rendering) ─────────────────────────────────────────────
 from app.pages import bestandsanalyse, limitierung
 
 
@@ -71,9 +80,10 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-apply_theme()
-DAV_LOGO_SRC = get_logo_src("dav_logo.svg")
+apply_theme()  # Globales CSS-Styling (Farben, Schriftarten) aktivieren
+DAV_LOGO_SRC = get_logo_src("dav_logo.svg")  # Logo als eingebettete Base64-URI laden
 
+# Mapping: Anzeigename → DataFrame-Spaltenname für alle Gruppierungsoptionen
 GRUPPIER_DIMENSIONEN = {
     "Tarifwerk": "tarifwerk",
     "Tarifart": "tarifart",
@@ -83,14 +93,21 @@ GRUPPIER_DIMENSIONEN = {
     "Hist. Belastung": "hist_belastung",
 }
 
+# ── Adapter-Funktionen (leiten an Service-Schicht weiter) ───────────────────
+
 def _geschlecht_label(code):
+    # Konvertiert numerischen Geschlechtscode in lesbaren Label (für Multiselect)
     return geschlecht_label(code)
 
 def _farb_map_dynamisch(df, spalte):
+    # Weist jeder eindeutigen Ausprägung in `spalte` eine Farbe aus PALETTE_GROSS zu
     return farb_map_dynamisch_service(df, spalte, PALETTE_GROSS)
+
+# ── Gecachte Wrapper: Ergebnisse werden bei gleichem Input wiederverwendet ──
 
 @st.cache_data(show_spinner="Lade Daten …")
 def lade_csv(datei, name: str):
+    # Liest CSV ein und validiert Pflichtfelder; stoppt die App bei Formatfehlern
     try:
         df, warnungen = lade_csv_service(datei, name)
         return df, warnungen
@@ -100,6 +117,7 @@ def lade_csv(datei, name: str):
 
 @st.cache_data(show_spinner=False)
 def berechne_kpis(_hash, df):
+    # _hash dient nur als Cache-Key (df selbst ist nicht hashbar)
     return berechne_kpis_service(df)
 
 @st.cache_data(show_spinner=False)
@@ -108,6 +126,7 @@ def berechne_treemap_daten(_hash, df, farb_spalte):
 
 @st.cache_data(show_spinner=False)
 def berechne_interaktive_statistik(_hash, df, gruppen_spalten_tuple):
+    # gruppen_spalten_tuple muss ein Tuple sein (Listen sind nicht hashbar für st.cache_data)
     return berechne_interaktive_statistik_service(df, gruppen_spalten_tuple)
 
 @st.cache_data(show_spinner=False)
@@ -120,6 +139,7 @@ def berechne_hist_daten(_hash, df, farb_spalte, wert_spalte):
 # =============================================================================
 
 with st.sidebar:
+    # DAV-Logo als zentrierter Header mit dunklem Hintergrund
     st.markdown(f"""
     <div style="text-align:center; padding:8px 0 12px 0; border-bottom:2px solid #0078C8; margin-bottom:16px;">
         <div style="display:inline-block; background:#003056; padding:8px 12px; border-radius:8px;">
@@ -130,18 +150,22 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     st.markdown("## 📂 Datenimport")
 
+    # Auswahl: Demo-Daten aus lokalem Verzeichnis oder manuelle CSV-Uploads
     upload_modus = st.radio("Datenquelle", ["Mock-Daten (lokaler Pfad)", "CSV-Upload"], index=0)
 
     if upload_modus == "Mock-Daten (lokaler Pfad)":
         pfad = st.text_input("Verzeichnis", value="./output_daten")
         if st.button("Daten laden", type="primary", use_container_width=True):
             try:
+                # Alle drei Datendateien einlesen
                 df_b, w_b = lade_csv(f"{pfad}/bestand.csv", "bestand")
                 df_t, w_t = lade_csv(f"{pfad}/tarife.csv", "tarife")
                 df_a, w_a = lade_csv(f"{pfad}/ausscheideordnung.csv", "ao")
+                # DataFrames im Session-State speichern (app-weite Datenhaltung)
                 st.session_state["df_bestand"] = df_b
                 st.session_state["df_tarife"] = df_t
                 st.session_state["df_ao"] = df_a
+                # Gefilterten Bestand zurücksetzen, damit kein veralteter Filter verbleibt
                 st.session_state.pop("df_gefiltert", None)
                 st.success(f"✓ {len(df_b):,} Versicherte geladen")
                 alle_warnungen = w_b + w_t + w_a
@@ -153,10 +177,11 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Fehler: {e}")
     else:
+        # Upload-Widgets für alle drei Pflichtdateien
         f_b = st.file_uploader("bestand.csv", type="csv", key="up_b")
         f_t = st.file_uploader("tarife.csv", type="csv", key="up_t")
         f_a = st.file_uploader("ausscheideordnung.csv", type="csv", key="up_a")
-        if f_b and f_t and f_a:
+        if f_b and f_t and f_a:  # Erst laden wenn alle drei Dateien vorhanden sind
             df_b, w_b = lade_csv(f_b, "bestand")
             df_t, w_t = lade_csv(f_t, "tarife")
             df_a, w_a = lade_csv(f_a, "ao")
@@ -170,12 +195,13 @@ with st.sidebar:
                 st.warning(f"⚠️ {w}")
             logger.info("Daten geladen (Upload): %d Versicherte, %d Warnungen", len(df_b), len(alle_warnungen))
 
-    df_bestand = st.session_state.get("df_bestand")
+    df_bestand = st.session_state.get("df_bestand")  # Aktuell geladener Gesamtbestand
 
     if df_bestand is not None:
         st.markdown("---")
         st.markdown("## 🔍 Filter")
 
+        # Filterformular: alle Änderungen werden erst bei "Filter anwenden" wirksam
         with st.form("filter_form"):
             alle_tw = sorted(df_bestand["tarifwerk"].unique())
             gew_tw = st.multiselect("Tarifwerk", alle_tw, default=alle_tw)
@@ -189,20 +215,22 @@ with st.sidebar:
             alle_geschl = sorted(df_bestand["geschlecht"].unique())
             gew_geschl = st.multiselect(
                 "Geschlecht", alle_geschl, default=alle_geschl,
-                format_func=_geschlecht_label,
+                format_func=_geschlecht_label,  # Numerischer Code → lesbarer Text
             )
 
             a_min, a_max = int(df_bestand["alter"].min()), int(df_bestand["alter"].max())
             gew_alter = st.slider("Altersbereich", a_min, a_max, (a_min, a_max))
 
             st.markdown("**Erhöhungsfilter**")
+            # Obergrenze dynamisch aus den Daten ableiten (auf ganze Zahl aufrunden)
             e_pct_max = float(np.ceil(df_bestand["erhoehung_prozent"].max()))
             gew_erh_pct = st.slider("Erhöhung (%)", 0.0, e_pct_max, (0.0, e_pct_max), step=1.0, format="%.0f%%")
 
-            e_abs_max = float(np.ceil(df_bestand["erhoehung_absolut"].max() / 10) * 10)
+            e_abs_max = float(np.ceil(df_bestand["erhoehung_absolut"].max() / 10) * 10)  # Auf 10 € aufrunden
             gew_erh_abs = st.slider("Erhöhung (€/Monat)", 0.0, e_abs_max,
                                     (0.0, e_abs_max), step=5.0, format="%.0f €")
 
+            # Logik-Verknüpfung zwischen %-Filter und €-Filter wählbar
             erh_logik = st.radio("Verknüpfung % und €",
                                  ["UND (beide müssen zutreffen)", "ODER (eine reicht)"],
                                  index=0, horizontal=True)
@@ -210,6 +238,7 @@ with st.sidebar:
             filter_btn = st.form_submit_button("🔍 Filter anwenden", use_container_width=True, type="primary")
 
         if filter_btn:
+            # Basismaske: strukturelle Merkmale (Tarifwerk, -art, ID, Geschlecht, Alter)
             maske_basis = (
                 df_bestand["tarifwerk"].isin(gew_tw if gew_tw else alle_tw)
                 & df_bestand["tarifart"].isin(gew_ta if gew_ta else alle_ta)
@@ -219,15 +248,18 @@ with st.sidebar:
             )
             maske_pct = df_bestand["erhoehung_prozent"].between(gew_erh_pct[0], gew_erh_pct[1])
             maske_abs = df_bestand["erhoehung_absolut"].between(gew_erh_abs[0], gew_erh_abs[1])
+            # Erhöhungsmasken je nach gewählter Logik kombinieren
             maske_erh = (maske_pct & maske_abs) if "UND" in erh_logik else (maske_pct | maske_abs)
             st.session_state["df_gefiltert"] = df_bestand[maske_basis & maske_erh]
 
+        # Inizialisierung: beim ersten Laden ohne Filter den vollen Bestand verwenden
         if "df_gefiltert" not in st.session_state and df_bestand is not None:
             st.session_state["df_gefiltert"] = df_bestand
 
         df_gef = st.session_state.get("df_gefiltert")
         if df_gef is not None:
             st.markdown("---")
+            # Zeigt an wie viele Datensätze den aktiven Filtern entsprechen
             st.metric("Gefiltert", f"{len(df_gef):,} / {len(df_bestand):,}")
 
 
@@ -256,13 +288,15 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-df_gefiltert = st.session_state.get("df_gefiltert")
-df_bestand = st.session_state.get("df_bestand")
+df_gefiltert = st.session_state.get("df_gefiltert")  # Aktuell gefilterter Bestand
+df_bestand = st.session_state.get("df_bestand")     # Vollständiger Bestand (ungefiltert)
 
+# Sicherheitsabfrage: App bricht mit Hinweis ab wenn noch keine Daten geladen wurden
 if df_gefiltert is None or df_bestand is None:
     st.info("Bitte laden Sie die Daten über die Sidebar (links).")
     st.stop()
 
+# Zwei Haupt-Tabs: Bestandsübersicht und Limitierungsrechnung
 tab_bestand, tab_limitierung = st.tabs(["📊 Bestandsanalyse", "⚖️ Limitierungsrechnung"])
 
 
@@ -289,31 +323,39 @@ with tab_bestand:
 
 @st.cache_data(show_spinner="Berechne Leibrentenbarwerte …")
 def berechne_barwertfaktoren(_ao_hash, df_ao, df_tarife):
+    # Berechnet unbefristete Leibrentenbarwerte auf Basis der Ausscheideordnung
     return berechne_barwertfaktoren_service(df_ao, df_tarife)
 
 @st.cache_data(show_spinner="Berechne befristete Barwerte …")
 def berechne_barwertfaktoren_befristet(_ao_hash, df_ao, df_tarife, laufzeit_jahre):
+    # Wie oben, jedoch mit festem Zeithorizont (z. B. für Rentengarantie)
     return berechne_barwertfaktoren_befristet_service(df_ao, df_tarife, laufzeit_jahre)
 
 @st.cache_data(show_spinner=False)
 def berechne_limitierung(_hash, df, df_bwf, regeln, modus, laufzeit_jahre):
+    # Kernrechnung: wendet Limitierungsregeln auf jeden Versicherten an
     return berechne_limitierung_service(df, df_bwf, regeln, modus, laufzeit_jahre)
 
 @st.cache_data(show_spinner=False)
 def berechne_sensitivitaet(_hash, df, df_bwf, regeln_basis, modus, laufzeit):
+    # Variiert einen Parameter über einen Wertebereich und berechnet je eine Limitierung
     return berechne_sensitivitaet_service(df, df_bwf, regeln_basis, modus, laufzeit)
 
 @st.cache_data(show_spinner="Berechne Optimierungsgitter …")
 def berechne_gitter(erh_pct, erh_abs, praemie_alt, bwf_vals, opt_modus, opt_gewicht_pct):
+    # Erzeugt ein 2-D Gitter über alle Kombinationen von %-Schwelle und €-Schwelle
     return berechne_gitter_service(erh_pct, erh_abs, praemie_alt, bwf_vals, opt_modus, opt_gewicht_pct)
 
 def berechne_optimale_budgetstufen(df_gitter, n_versicherte, budget_max, schrittweite_mio):
+    # Ermittelt für jede Budgetstufe die effizienteste Parameterkombination
     return berechne_optimale_budgetstufen_service(df_gitter, n_versicherte, budget_max, schrittweite_mio)
 
 def finde_knickpunkt(df_opt):
+    # Identifiziert den Knickpunkt (Elbow) auf der Pareto-Front
     return finde_knickpunkt_service(df_opt)
 
 def berechne_pareto_front(df_gitter, budget_eur):
+    # Filtert das Gitter auf Pareto-optimale Punkte für ein gegebenes Gesamtbudget
     return berechne_pareto_front_service(df_gitter, budget_eur)
 
 
