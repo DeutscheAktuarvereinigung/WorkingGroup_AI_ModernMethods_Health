@@ -209,3 +209,60 @@ class TestValidierung:
         csv_buf.seek(0)
         with pytest.raises(ValueError, match="Ausscheideordnung.*Fehlende Spalten"):
             lade_csv(csv_buf, "ao")
+
+
+# ── person_id Validierung ────────────────────────────────────────────────────
+
+
+class TestPersonIdValidierung:
+
+    def _bestand_df(self, **overrides):
+        daten = {
+            "versicherten_id": ["V1", "V2", "V3"],
+            "person_id": ["P1", "P1", "P2"],
+            "alter": [45, 45, 30],
+            "geschlecht": ["M", "M", "W"],
+            "tarifwerk": ["Classic", "Classic", "Komfort"],
+            "tarif_id": ["CL-AMB", "CL-STAT", "KO-AMB"],
+            "tarifart": ["ambulant", "stationaer", "ambulant"],
+            "praemie_alt_monatlich": [200.0, 350.0, 180.0],
+            "praemie_neu_monatlich": [260.0, 455.0, 216.0],
+            "erhoehung_absolut": [60.0, 105.0, 36.0],
+            "erhoehung_prozent": [30.0, 30.0, 20.0],
+            "alterungsrueckstellung": [5000.0, 15000.0, 3000.0],
+            "versicherungsdauer_jahre": [5, 15, 3],
+        }
+        daten.update(overrides)
+        return pd.DataFrame(daten)
+
+    def test_konsistente_person_id_keine_warnung(self):
+        """Gleiche Demographie pro person_id → keine Warnung."""
+        df = self._bestand_df()
+        warnungen = _validiere_bestand(df)
+        assert not any("person_id" in w for w in warnungen)
+
+    def test_inkonsistentes_alter_warnung(self):
+        """Verschiedene Alter innerhalb einer person_id → Warnung."""
+        df = self._bestand_df(alter=[45, 50, 30])  # P1 hat Alter 45 und 50
+        warnungen = _validiere_bestand(df)
+        assert any("inkonsistente Demographie" in w for w in warnungen)
+
+    def test_inkonsistentes_geschlecht_warnung(self):
+        """Verschiedenes Geschlecht innerhalb einer person_id → Warnung."""
+        df = self._bestand_df(geschlecht=["M", "W", "W"])  # P1 hat M und W
+        warnungen = _validiere_bestand(df)
+        assert any("inkonsistente Demographie" in w for w in warnungen)
+
+    def test_bestand_ohne_person_id_kein_fehler(self):
+        """Bestand ohne person_id wird problemlos validiert."""
+        df = self._bestand_df()
+        df = df.drop(columns=["person_id"])
+        warnungen = _validiere_bestand(df)
+        # Keine person_id-bezogene Warnung
+        assert not any("person_id" in w for w in warnungen)
+
+    def test_nan_in_person_id_warnung(self):
+        """NaN-Werte in person_id → Warnung."""
+        df = self._bestand_df(person_id=["P1", None, "P2"])
+        warnungen = _validiere_bestand(df)
+        assert any("person_id" in w and "fehlende" in w for w in warnungen)

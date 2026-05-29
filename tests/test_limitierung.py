@@ -10,9 +10,8 @@ from services.limitierung import (
     berechne_barwertfaktoren,
     berechne_barwertfaktoren_befristet,
     berechne_limitierung,
-    berechne_optimierungsvorschlaege,
+    berechne_limitierung_person,
     berechne_sensitivitaet,
-    berechne_teilbestand_vorschlaege,
 )
 
 
@@ -345,120 +344,148 @@ class TestBerechneSensitivitaet:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Optimierungsvorschläge
+# Personen-Limitierung
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-class TestBerechneOptimierungsvorschlaege:
+class TestBerechneLimitierungPerson:
 
-    def test_ergebnis_struktur(self, bestand_klein, barwertfaktoren):
-        regeln = [{"ziel_pct": 15.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
-        result = berechne_optimierungsvorschlaege(
-            bestand_klein, barwertfaktoren, regeln, "full", 10, 1_000_000,
+    def test_ergebnis_spalten_vorhanden(self, bestand_mit_personen, barwertfaktoren):
+        """Ergebnis enthält alle Personen-Level-Spalten."""
+        regeln = [{"ziel_pct": 25.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
+        personen_regel = {"ziel_abs": 100.0}
+        res = berechne_limitierung_person(
+            bestand_mit_personen, barwertfaktoren, regeln, personen_regel, "full", 10,
         )
-        assert isinstance(result, list)
-        for v in result:
-            assert "typ" in v
-            assert "beschreibung" in v
-            assert "einsparung_eur" in v
-            assert v["typ"] in ("einsparung", "verbesserung")
+        assert "erhoehung_person_gesamt_vorher" in res.columns
+        assert "erhoehung_person_gesamt_nachher" in res.columns
+        assert "person_limitiert" in res.columns
 
-    def test_einsparung_hat_positive_werte(self, bestand_klein, barwertfaktoren):
-        regeln = [{"ziel_pct": 15.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
-        result = berechne_optimierungsvorschlaege(
-            bestand_klein, barwertfaktoren, regeln, "full", 10, 1_000_000,
+    def test_proportional_summe_unter_cap(self, bestand_mit_personen, barwertfaktoren):
+        """Bei proportionaler Verteilung bleibt die Personen-Gesamterhöhung ≤ Cap."""
+        regeln = []
+        personen_regel = {"ziel_abs": 100.0}  # Max 100 €/Mon pro Person
+        res = berechne_limitierung_person(
+            bestand_mit_personen, barwertfaktoren, regeln, personen_regel, "full", 10,
+            verteilungsmodus="proportional",
         )
-        for v in result:
-            if v["typ"] == "einsparung":
-                assert v["einsparung_eur"] > 0
+        # Prüfe pro Person
+        df_check = bestand_mit_personen[["person_id"]].copy()
+        df_check["erh_limited"] = res["erhoehung_limitiert_abs"].values
+        for pid, grp in df_check.groupby("person_id"):
+            assert grp["erh_limited"].sum() <= 100.0 + 0.01
 
-    def test_verbesserung_hat_negative_werte(self, bestand_klein, barwertfaktoren):
-        regeln = [{"ziel_pct": 15.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
-        result = berechne_optimierungsvorschlaege(
-            bestand_klein, barwertfaktoren, regeln, "full", 10, 1_000_000,
+    def test_groesster_zuerst_reduziert_maximum(self, bestand_mit_personen, barwertfaktoren):
+        """Bei groesster_zuerst wird der größte Tarif bevorzugt reduziert."""
+        regeln = []
+        # P001 hat erhoehung_absolut [60, 105] → Summe 165, Cap 100 → 65 Reduktion
+        personen_regel = {"ziel_abs": 100.0}
+        res = berechne_limitierung_person(
+            bestand_mit_personen, barwertfaktoren, regeln, personen_regel, "full", 10,
+            verteilungsmodus="groesster_zuerst",
         )
-        for v in result:
-            if v["typ"] == "verbesserung":
-                assert v["einsparung_eur"] < 0
+        # P001: V001 (60€) und V002 (105€). Bei groesster_zuerst wird V002 zuerst reduziert
+        erh_v002 = res["erhoehung_limitiert_abs"].values[1]
+        erh_v001 = res["erhoehung_limitiert_abs"].values[0]
+        # V002 sollte stärker reduziert sein als V001
+        assert erh_v002 < 105.0  # V002 wurde reduziert
+        # Summe P001 muss ≤ 100
+        assert erh_v001 + erh_v002 <= 100.0 + 0.01
 
-    def test_leere_regeln(self, bestand_klein, barwertfaktoren):
-        result = berechne_optimierungsvorschlaege(
-            bestand_klein, barwertfaktoren, [], "full", 10, 1_000_000,
+    def test_proportional_verteilung_korrekt(self, bestand_mit_personen, barwertfaktoren):
+        """Proportionale Verteilung: Reduktion proportional zur Einzel-Erhöhung."""
+        regeln = []
+        personen_regel = {"ziel_abs": 100.0}
+        res = berechne_limitierung_person(
+            bestand_mit_personen, barwertfaktoren, regeln, personen_regel, "full", 10,
+            verteilungsmodus="proportional",
         )
-        assert result == []
+        # P001 hat [60, 105] → Summe 165, Cap 100, Reduktion 65
+        # Proportional: V001 anteil = 60/165, V002 anteil = 105/165
+        erh_v001 = res["erhoehung_limitiert_abs"].values[0]
+        erh_v002 = res["erhoehung_limitiert_abs"].values[1]
+        # V001: 60 - 65 * (60/165) ≈ 60 - 23.64 ≈ 36.36
+        assert erh_v001 == pytest.approx(60.0 - 65.0 * (60.0 / 165.0), abs=0.01)
+        # V002: 105 - 65 * (105/165) ≈ 105 - 41.36 ≈ 63.64
+        assert erh_v002 == pytest.approx(105.0 - 65.0 * (105.0 / 165.0), abs=0.01)
 
-    def test_sehr_niedriges_ziel_kein_verschaerfung(self, bestand_klein, barwertfaktoren):
-        """Ziel bei 5% → keine Verschärfung möglich (da min-Grenze 5%)."""
-        regeln = [{"ziel_pct": 5.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
-        result = berechne_optimierungsvorschlaege(
-            bestand_klein, barwertfaktoren, regeln, "full", 10, 1_000_000,
+    def test_person_ohne_ueberschreitung_nicht_limitiert(self, bestand_mit_personen, barwertfaktoren):
+        """Person unter dem Cap wird nicht limitiert."""
+        regeln = []
+        # P003 hat [15, 45] → Summe 60. Cap 200 → keine Limitierung
+        personen_regel = {"ziel_abs": 200.0}
+        res = berechne_limitierung_person(
+            bestand_mit_personen, barwertfaktoren, regeln, personen_regel, "full", 10,
         )
-        for v in result:
-            assert v["typ"] != "verbesserung"
+        # P003: V005 und V006 (Indices 4, 5)
+        assert not res["person_limitiert"].values[4]
+        assert not res["person_limitiert"].values[5]
+        # Erhöhungen unverändert
+        assert res["erhoehung_limitiert_abs"].values[4] == pytest.approx(15.0, abs=0.01)
+        assert res["erhoehung_limitiert_abs"].values[5] == pytest.approx(45.0, abs=0.01)
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Teilbestand-Vorschläge
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-class TestBerechneTeilbestandVorschlaege:
-
-    @pytest.fixture
-    def grosser_bestand(self):
-        """Bestand mit >=100 Versicherten pro Segment."""
-        rng = np.random.default_rng(42)
-        n = 600
-        return pd.DataFrame({
-            "versicherten_id": [f"V{i:04d}" for i in range(n)],
-            "alter": rng.integers(20, 80, n),
-            "geschlecht": rng.choice(["M", "W"], n),
-            "tarifwerk": np.repeat(["Classic", "Komfort", "Premium"], n // 3),
-            "tarif_id": np.repeat(["CL-AMB", "KO-AMB", "PR-AMB"], n // 3),
-            "tarifart": np.repeat(["ambulant", "ambulant", "ambulant"], n // 3),
-            "praemie_alt_monatlich": rng.uniform(100, 500, n).round(2),
-            "praemie_neu_monatlich": rng.uniform(120, 600, n).round(2),
-            "erhoehung_absolut": rng.uniform(5, 100, n).round(2),
-            "erhoehung_prozent": rng.uniform(3, 50, n).round(2),
-            "alterungsrueckstellung": rng.uniform(1000, 30000, n).round(2),
-            "versicherungsdauer_jahre": rng.integers(1, 40, n),
-        })
-
-    def test_ergebnis_ist_liste(self, grosser_bestand, barwertfaktoren):
-        regeln = [{"ziel_pct": 20.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
-        result = berechne_teilbestand_vorschlaege(
-            grosser_bestand, barwertfaktoren, regeln, "full", 10, 1_000_000,
+    def test_ziel_pct_begrenzt_auf_gesamtpraemie(self, bestand_mit_personen, barwertfaktoren):
+        """ziel_pct begrenzt auf Prozent der Gesamtprämie der Person."""
+        regeln = []
+        # P001: praemie_alt = [200, 350] → Gesamt 550, ziel_pct=10 → max 55€
+        # Erh = [60, 105] → Summe 165 > 55 → reduziert
+        personen_regel = {"ziel_pct": 10.0}
+        res = berechne_limitierung_person(
+            bestand_mit_personen, barwertfaktoren, regeln, personen_regel, "full", 10,
+            verteilungsmodus="proportional",
         )
-        assert isinstance(result, list)
+        df_check = bestand_mit_personen[["person_id"]].copy()
+        df_check["erh_limited"] = res["erhoehung_limitiert_abs"].values
+        p001_sum = df_check[df_check["person_id"] == "P001"]["erh_limited"].sum()
+        assert p001_sum <= 55.0 + 0.01
 
-    def test_maximal_10_vorschlaege(self, grosser_bestand, barwertfaktoren):
-        regeln = [{"ziel_pct": 20.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
-        result = berechne_teilbestand_vorschlaege(
-            grosser_bestand, barwertfaktoren, regeln, "full", 10, 1_000_000,
-        )
-        assert len(result) <= 10
+    def test_reihenfolge_tarif_zuerst_vs_person_zuerst(self, bestand_mit_personen, barwertfaktoren):
+        """Verschiedene Reihenfolgen liefern unterschiedliche aber valide Ergebnisse."""
+        regeln = [{"ziel_pct": 25.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
+        personen_regel = {"ziel_abs": 80.0}
 
-    def test_ohne_globale_regel_leer(self, grosser_bestand, barwertfaktoren):
-        """Ohne globale Regel → keine Vorschläge."""
-        regeln = [{"ziel_pct": 10.0, "ziel_abs": None, "scope_spalte": "tarifart", "scope_werte": ["ambulant"]}]
-        result = berechne_teilbestand_vorschlaege(
-            grosser_bestand, barwertfaktoren, regeln, "full", 10, 1_000_000,
+        res_tf = berechne_limitierung_person(
+            bestand_mit_personen, barwertfaktoren, regeln, personen_regel, "full", 10,
+            reihenfolge="tarif_zuerst",
         )
-        assert result == []
+        res_pf = berechne_limitierung_person(
+            bestand_mit_personen, barwertfaktoren, regeln, personen_regel, "full", 10,
+            reihenfolge="person_zuerst",
+        )
+        # Beide müssen Personen-Cap einhalten
+        df_check_tf = bestand_mit_personen[["person_id"]].copy()
+        df_check_tf["erh"] = res_tf["erhoehung_limitiert_abs"].values
+        df_check_pf = bestand_mit_personen[["person_id"]].copy()
+        df_check_pf["erh"] = res_pf["erhoehung_limitiert_abs"].values
 
-    def test_vorschlaege_typ_teilbestand(self, grosser_bestand, barwertfaktoren):
-        regeln = [{"ziel_pct": 20.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
-        result = berechne_teilbestand_vorschlaege(
-            grosser_bestand, barwertfaktoren, regeln, "full", 10, 1_000_000,
-        )
-        for v in result:
-            assert v["typ"] == "teilbestand"
-            assert v["betroffene"] > 0
+        for pid in bestand_mit_personen["person_id"].unique():
+            assert df_check_tf[df_check_tf["person_id"] == pid]["erh"].sum() <= 80.0 + 0.01
+            assert df_check_pf[df_check_pf["person_id"] == pid]["erh"].sum() <= 80.0 + 0.01
 
-    def test_kleiner_bestand_keine_vorschlaege(self, bestand_klein, barwertfaktoren):
-        """< 100 Versicherte pro Segment → keine Vorschläge."""
-        regeln = [{"ziel_pct": 20.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
-        result = berechne_teilbestand_vorschlaege(
-            bestand_klein, barwertfaktoren, regeln, "full", 10, 1_000_000,
+    def test_keine_person_id_wirft_valueerror(self, bestand_klein, barwertfaktoren):
+        """Ohne person_id-Spalte wird ValueError geworfen."""
+        regeln = []
+        personen_regel = {"ziel_abs": 100.0}
+        with pytest.raises(ValueError, match="person_id"):
+            berechne_limitierung_person(
+                bestand_klein, barwertfaktoren, regeln, personen_regel, "full", 10,
+            )
+
+    def test_leere_personen_regel_nur_tarif(self, bestand_mit_personen, barwertfaktoren):
+        """Ohne Personen-Ziel wird nur Tarif-Limitierung angewendet."""
+        regeln = [{"ziel_pct": 25.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
+        personen_regel = {}  # Kein Personen-Cap
+        res = berechne_limitierung_person(
+            bestand_mit_personen, barwertfaktoren, regeln, personen_regel, "full", 10,
         )
-        assert result == []
+        assert not res["person_limitiert"].any()
+
+    def test_einmaleinlage_positiv_bei_limitierung(self, bestand_mit_personen, barwertfaktoren):
+        """Limitierte Tarife haben nicht-negative Einmaleinlagen."""
+        regeln = []
+        personen_regel = {"ziel_abs": 50.0}
+        res = berechne_limitierung_person(
+            bestand_mit_personen, barwertfaktoren, regeln, personen_regel, "full", 10,
+        )
+        assert (res["einmaleinlage"] >= 0).all()
+        assert res.loc[res["limitiert"], "einmaleinlage"].sum() > 0

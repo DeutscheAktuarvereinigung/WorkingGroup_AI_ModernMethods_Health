@@ -71,6 +71,29 @@ def _validiere_bestand(df: pd.DataFrame) -> list[str]:
     if dups > 0:
         warnungen.append(f"{dups} doppelte versicherten_id gefunden.")
 
+    # --- person_id Konsistenzprüfung (optional) ---
+    if "person_id" in df.columns:
+        nan_pid = int(df["person_id"].isna().sum())
+        if nan_pid > 0:
+            warnungen.append(
+                f"Spalte 'person_id' enthält {nan_pid} fehlende Werte (NaN). "
+                "Personen-Limitierung ist für diese Zeilen nicht möglich."
+            )
+        # Prüfe Konsistenz: gleiche Demographie (alter, geschlecht) pro person_id
+        pid_gruppen = df.dropna(subset=["person_id"]).groupby("person_id")
+        demo_inkonsistent = 0
+        for spalte in ["alter", "geschlecht"]:
+            if spalte in df.columns:
+                n_unique = pid_gruppen[spalte].nunique()
+                inkonsistent = (n_unique > 1).sum()
+                if inkonsistent > 0:
+                    demo_inkonsistent += inkonsistent
+        if demo_inkonsistent > 0:
+            warnungen.append(
+                f"{demo_inkonsistent} person_id-Gruppen haben inkonsistente Demographie "
+                "(unterschiedliches Alter oder Geschlecht innerhalb einer Person)."
+            )
+
     # --- Geschlecht ---
     erlaubte_geschlechter = {"M", "W", "D"}
     unbekannte = set(df["geschlecht"].unique()) - erlaubte_geschlechter

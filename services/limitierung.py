@@ -403,215 +403,274 @@ def berechne_sensitivitaet(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln_basis,
     return pd.DataFrame(ergebnisse)
 
 
-def berechne_optimierungsvorschlaege(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln, modus, laufzeit, budget):
+def berechne_limitierung_person(
+    df: pd.DataFrame,
+    df_bwf: pd.DataFrame,
+    regeln: list,
+    personen_regel: dict,
+    modus: str,
+    laufzeit_jahre: int,
+    reihenfolge: str = "tarif_zuerst",
+    verteilungsmodus: str = "proportional",
+) -> pd.DataFrame:
     """
-    Generiert automatische Optimierungsvorschläge durch Variation der Limitierungsregeln.
-    
-    Diese Funktion testet verschiedene Szenarien durch Lockerung oder Verschärfung der aktuellen
-    Regeln und identifiziert umsetzbare Verbesserungen mit signifikanten Einsparpotentialen oder
-    sozialen Verbesserungen. Nur Vorschläge mit mindestens 10.000 € Wirkung werden berücksichtigt.
-    
+    Berechnet Limitierung mit zusätzlicher Personenebene.
+
+    Wendet Tarif-Limitierungsregeln und Personen-Caps an. Die Reihenfolge ist
+    konfigurierbar: bei 'tarif_zuerst' werden erst Tarif-Caps angewendet, dann
+    der Personen-Cap auf die bereits limitierten Werte. Bei 'person_zuerst' umgekehrt.
+
     Args:
-        df (pd.DataFrame): Bestands-DataFrame
-        df_bwf (pd.DataFrame): Barwertfaktoren
-        regeln (list): Aktuelle Limitierungsregeln
-        modus (str): Betriebsmodus
-        laufzeit (int): Versorgungslaufzeit
-        budget (float): Verfügbares Budget (in €) als Obergrenze für Verbessungen
-    
+        df: Bestands-DataFrame mit person_id-Spalte.
+        df_bwf: Barwertfaktoren (tarif_id, geschlecht, alter, barwertfaktor).
+        regeln: Liste von Tarif-Limitierungsregeln (wie bei berechne_limitierung).
+        personen_regel: Dict mit Personen-Cap:
+            - ziel_abs (float, optional): Max. Gesamterhöhung €/Monat pro Person
+            - ziel_pct (float, optional): Max. Gesamterhöhung in % der Gesamtprämie
+        modus: Betriebsmodus (wird an berechne_limitierung durchgereicht).
+        laufzeit_jahre: Versorgungslaufzeit in Jahren.
+        reihenfolge: 'tarif_zuerst' oder 'person_zuerst'.
+        verteilungsmodus: 'proportional' oder 'groesster_zuerst'.
+
     Returns:
-        list: Liste von Optimierungsvorschlägen, jeder mit:
-            - typ: 'einsparung' (lockernde Regel) oder 'verbesserung' (strengere Regel)
-            - beschreibung: Lesbare Beschreibung des Vorschlags
-            - einsparung_eur: Ersparnis (positiv) oder Mehrkosten (negativ)
-            - betroffene: Anzahl der zusätzlich limitierten/entlasteten Versicherten
-            - regel_index: Index der modifizierten Regel
-            - neue_regel: Die vorgeschlagene neue Regelkonfiguration
+        pd.DataFrame: Alle Spalten von berechne_limitierung plus:
+            - erhoehung_person_gesamt_vorher: Summe aller Tarif-Erhöhungen der Person vor Personen-Cap
+            - erhoehung_person_gesamt_nachher: Summe nach Personen-Cap
+            - person_limitiert: True wenn Personen-Cap gegriffen hat
     """
-    vorschlaege = []
-    
-    # Berechne Baseline für alle Vergleiche
-    aktuell = berechne_limitierung(df, df_bwf, regeln, modus, laufzeit)
-    bedarf_aktuell = aktuell["einmaleinlage"].sum()  # Aktueller Rückstellungsbedarf
+    if "person_id" not in df.columns:
+        raise ValueError(
+            "Personen-Limitierung erfordert Spalte 'person_id' im Bestand."
+        )
 
-    # === ERSTE PHASE: Teste Lockerung der Regeln (Kosteneinsparung) ===
-    for i, regel in enumerate(regeln):
-        ziel_pct = regel.get("ziel_pct")
-        if ziel_pct is None:
-            continue  # Überspringe Regeln ohne prozentuale Ziele
+    person_ziel_abs = personen_regel.get("ziel_abs")
+    person_ziel_pct = personen_regel.get("ziel_pct")
 
-        # Teste verschiedene Lockerungsstufen (+2%, +5%, +10%)
-        for delta in [2, 5, 10]:
-            # Erstelle neue Regelversion mit gelockertere Ziel
-            neue_regeln = [r.copy() for r in regeln]
-            neue_regeln[i] = {**neue_regeln[i], "ziel_pct": ziel_pct + delta}
-            
-            # Berechne Limitierung mit der gelockerten Regel
-            res_neu = berechne_limitierung(df, df_bwf, neue_regeln, modus, laufzeit)
-            bedarf_neu = res_neu["einmaleinlage"].sum()
-            einsparung = bedarf_aktuell - bedarf_neu  # Positive Werte = Ersparnisse
+    if person_ziel_abs is None and person_ziel_pct is None:
+        logger.warning("Personen-Regel enthält weder ziel_abs noch ziel_pct. "
+                        "Nur Tarif-Limitierung wird angewendet.")
+        res_tarif = berechne_limitierung(df, df_bwf, regeln, modus, laufzeit_jahre)
+        n = len(df)
+        res_tarif["erhoehung_person_gesamt_vorher"] = np.nan
+        res_tarif["erhoehung_person_gesamt_nachher"] = np.nan
+        res_tarif["person_limitiert"] = False
+        return res_tarif
 
-            # Nur signifikante Einsparungen (> 10k€) berücksichtigen
-            if einsparung > 10000:
-                # Zähle Versicherte, die durch die Lockerung mehr belastet werden
-                mehr_belastet = (res_neu["erhoehung_limitiert_pct"] > aktuell["erhoehung_limitiert_pct"] + 0.1).sum()
-                
-                # Formatiere Regelbezeichnung (Global oder Segment)
-                scope_text = f"{regel.get('scope_spalte', 'Alle')}: {regel.get('scope_werte', 'Alle')}" if regel.get("scope_spalte") else "Global"
-
-                vorschlaege.append({
-                    "typ": "einsparung",
-                    "beschreibung": f"Regel '{scope_text}' von {ziel_pct:.0f}% auf {ziel_pct + delta:.0f}% lockern",
-                    "einsparung_eur": einsparung,  # Positive Werte
-                    "betroffene": mehr_belastet,  # Nachteil-Zahl
-                    "regel_index": i,
-                    "neue_regel": neue_regeln[i],
-                })
-
-    # === ZWEITE PHASE: Teste Verschärfung der Regeln (soziale Verbesserung) ===
-    for i, regel in enumerate(regeln):
-        ziel_pct = regel.get("ziel_pct")
-        if ziel_pct is None or ziel_pct <= 5:
-            continue  # Überspringe Regeln ohne Ziel oder mit sehr niedrigem Ziel
-
-        # Teste verschiedene Verschärfungsstufen (-2%, -5%)
-        for delta in [2, 5]:
-            # Erstelle neue Regelversion mit strengerem Ziel
-            neues_ziel = max(ziel_pct - delta, 0)  # Aber nicht unter 0%
-            neue_regeln = [r.copy() for r in regeln]
-            neue_regeln[i] = {**neue_regeln[i], "ziel_pct": neues_ziel}
-            
-            # Berechne Limitierung mit der strengeren Regel
-            res_neu = berechne_limitierung(df, df_bwf, neue_regeln, modus, laufzeit)
-            bedarf_neu = res_neu["einmaleinlage"].sum()
-            mehrkosten = bedarf_neu - bedarf_aktuell  # Positive Werte = zusätzliche Kosten
-
-            # Filter: Nur umsetzbar, wenn Mehrkosten < 1,5x verfügbares Budget und > 0
-            if mehrkosten > 0 and mehrkosten < (budget - bedarf_aktuell) * 1.5:
-                # Zähle Versicherte, die von der Verschärfung entlastet werden
-                entlastet = (res_neu["erhoehung_limitiert_pct"] < aktuell["erhoehung_limitiert_pct"] - 0.1).sum()
-                
-                # Formatiere Regelbezeichnung
-                scope_text = f"{regel.get('scope_spalte', 'Alle')}: {regel.get('scope_werte', 'Alle')}" if regel.get("scope_spalte") else "Global"
-
-                vorschlaege.append({
-                    "typ": "verbesserung",
-                    "beschreibung": f"Regel '{scope_text}' von {ziel_pct:.0f}% auf {neues_ziel:.0f}% verschärfen",
-                    "einsparung_eur": -mehrkosten,  # Negative Werte (Kosten)
-                    "betroffene": entlastet,  # Vorteil-Zahl
-                    "regel_index": i,
-                    "neue_regel": neue_regeln[i],
-                })
-
-    # Sortiere Vorschläge nach Betrag (höchste Auswirkungen zuerst)
-    vorschlaege.sort(key=lambda x: -abs(x["einsparung_eur"]))
-    return vorschlaege
+    if reihenfolge == "tarif_zuerst":
+        return _limitierung_tarif_dann_person(
+            df, df_bwf, regeln, person_ziel_abs, person_ziel_pct,
+            modus, laufzeit_jahre, verteilungsmodus,
+        )
+    elif reihenfolge == "person_zuerst":
+        return _limitierung_person_dann_tarif(
+            df, df_bwf, regeln, person_ziel_abs, person_ziel_pct,
+            modus, laufzeit_jahre, verteilungsmodus,
+        )
+    else:
+        raise ValueError(f"Unbekannte Reihenfolge: '{reihenfolge}'. "
+                         "Erlaubt: 'tarif_zuerst', 'person_zuerst'.")
 
 
-
-def berechne_teilbestand_vorschlaege(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln, modus, laufzeit, budget):
+def _wende_personen_cap_an(
+    person_ids: np.ndarray,
+    erh_abs: np.ndarray,
+    praemie_alt: np.ndarray,
+    ziel_abs: float | None,
+    ziel_pct: float | None,
+    verteilungsmodus: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Generiert Optimierungsvorschläge durch Hinzufügung von Regeln für einzelne Segmente (Tarifarten, Tarife).
-    
-    Diese Funktion identifiziert Segmente des Bestands, die stärker begrenzt werden könnten, um
-    Versicherte dieser Segmente gezielt zu entlasten. Sie testet zunächst alle Kombinationen von
-    Spalten (Tarifart, Tarif, Tarifwerk) und Werten, und schlägt nur Regeln für Segmente mit
-    ausreichender Größe (>= 100 Versicherte) vor, die nicht bereits reguliert sind.
-    
-    Args:
-        df (pd.DataFrame): Bestands-DataFrame mit Spalten tarifart, tarif_id, tarifwerk
-        df_bwf (pd.DataFrame): Barwertfaktoren
-        regeln (list): Aktuelle globale + segmentspezifische Regeln
-        modus (str): Betriebsmodus
-        laufzeit (int): Versorgungslaufzeit
-        budget (float): Verfügbares Budget
-    
+    Wendet Personen-Cap auf Erhöhungen an und verteilt Überschuss auf Einzeltarife.
+
     Returns:
-        list: Bis zu 10 beste Teilbestand-Vorschläge (nach Effizienzv verhältnis sortiert), jeder mit:
-            - typ: 'teilbestand'
-            - beschreibung: Beschreibung der neuen Segmentregel
-            - einsparung_eur: Mehrkosten (negative Werte)
-            - betroffene: Anzahl entlasteter Versicherten im Segment
-            - regel_index: Index der neuen Regel
-            - neue_regel: Die vorgeschlagene Segmentregel
+        Tuple aus (erh_abs_neu, erh_person_vorher, erh_person_nachher, person_limitiert)
+        - erh_abs_neu: Adjustierte absolute Erhöhungen pro Tarif-Zeile
+        - erh_person_vorher: Gesamt-Erhöhung der Person (vor Personen-Cap), pro Zeile broadcasted
+        - erh_person_nachher: Gesamt-Erhöhung nach Personen-Cap, pro Zeile broadcasted
+        - person_limitiert: Boolean pro Zeile, ob die Person limitiert wurde
     """
-    _ = budget  # Budget wird in dieser Heuristik aktuell nicht verwendet.
-    vorschlaege = []
+    n = len(person_ids)
+    erh_abs_neu = erh_abs.copy()
+    erh_person_vorher = np.zeros(n)
+    erh_person_nachher = np.zeros(n)
+    person_limitiert = np.zeros(n, dtype=bool)
 
-    # Berechne aktuelle Limitierung als Baseline
-    aktuell = berechne_limitierung(df, df_bwf, regeln, modus, laufzeit)
-    bedarf_aktuell = aktuell["einmaleinlage"].sum()
+    # Gruppiere nach person_id
+    df_temp = pd.DataFrame({
+        "person_id": person_ids,
+        "erh_abs": erh_abs,
+        "praemie_alt": praemie_alt,
+        "_idx": np.arange(n),
+    })
 
-    # Finde das globale Ziel (Referenz für Segment-Verschaerfungen)
-    global_ziel = None
-    for r in regeln:
-        if not r.get("scope_spalte") and r.get("ziel_pct") is not None:
-            global_ziel = r["ziel_pct"]
+    for pid, grp in df_temp.groupby("person_id"):
+        idx = grp["_idx"].values
+        erh_gruppe = erh_abs_neu[idx]
+        praemie_gruppe = grp["praemie_alt"].values
+
+        gesamt_erh = erh_gruppe.sum()
+        gesamt_praemie = praemie_gruppe.sum()
+        erh_person_vorher[idx] = gesamt_erh
+
+        # Bestimme effektiven Cap
+        cap = np.inf
+        if ziel_abs is not None:
+            cap = min(cap, ziel_abs)
+        if ziel_pct is not None and gesamt_praemie > 0:
+            cap = min(cap, gesamt_praemie * ziel_pct / 100.0)
+
+        if gesamt_erh <= cap or cap == np.inf:
+            erh_person_nachher[idx] = gesamt_erh
+            continue
+
+        # Überschuss verteilen
+        person_limitiert[idx] = True
+        reduktion = gesamt_erh - cap
+
+        if verteilungsmodus == "proportional":
+            erh_abs_neu[idx] = _verteile_proportional(erh_gruppe, reduktion)
+        elif verteilungsmodus == "groesster_zuerst":
+            erh_abs_neu[idx] = _verteile_groesster_zuerst(erh_gruppe, reduktion)
+        else:
+            raise ValueError(f"Unbekannter Verteilungsmodus: '{verteilungsmodus}'.")
+
+        erh_person_nachher[idx] = erh_abs_neu[idx].sum()
+
+    return erh_abs_neu, erh_person_vorher, erh_person_nachher, person_limitiert
+
+
+def _verteile_proportional(erh_gruppe: np.ndarray, reduktion: float) -> np.ndarray:
+    """Verteilt die Reduktion proportional zur Einzeltarif-Erhöhung."""
+    gesamt = erh_gruppe.sum()
+    if gesamt <= 0:
+        return erh_gruppe.copy()
+    anteile = erh_gruppe / gesamt
+    return np.maximum(erh_gruppe - reduktion * anteile, 0.0)
+
+
+def _verteile_groesster_zuerst(erh_gruppe: np.ndarray, reduktion: float) -> np.ndarray:
+    """Reduziert die größten Einzeltarif-Erhöhungen zuerst."""
+    result = erh_gruppe.copy()
+    sort_idx = np.argsort(-result)  # Absteigend sortiert, Indizes merken
+    rest = reduktion
+
+    for i in sort_idx:
+        if rest <= 0:
             break
+        # Maximal bis auf 0 reduzieren
+        moegliche_reduktion = min(rest, result[i])
+        result[i] -= moegliche_reduktion
+        rest -= moegliche_reduktion
 
-    # Abbruch, wenn kein globales Ziel definiert ist
-    if global_ziel is None:
-        return vorschlaege
+    return result
 
-    # Generiere alle moeglichen Segment-Kombinationen aus drei Dimensionen
-    segmente = []
-    for spalte, label in [("tarifart", "Tarifart"), ("tarif_id", "Tarif"), ("tarifwerk", "Tarifwerk")]:
-        for wert in sorted(df[spalte].unique()):
-            segmente.append((spalte, label, wert))
 
-    # Evaluiere jedes Segment
-    for spalte, label, wert in segmente:
-        # Ueberspringe kleine Segmente (< 100 Versicherte)
-        n_segment = (df[spalte] == wert).sum()
-        if n_segment < 100:
-            continue
+def _limitierung_tarif_dann_person(
+    df, df_bwf, regeln, person_ziel_abs, person_ziel_pct,
+    modus, laufzeit_jahre, verteilungsmodus,
+) -> pd.DataFrame:
+    """Erst Tarif-Limitierung, dann Personen-Cap auf limitierte Werte."""
+    logger.info("Reihenfolge: Tarif-Limitierung → Personen-Cap")
 
-        # Ueberspringe bereits regulierte Segmente
-        bereits_geregelt = False
-        for r in regeln:
-            if r.get("scope_spalte") == spalte and wert in (r.get("scope_werte") or []):
-                bereits_geregelt = True
-                break
-        if bereits_geregelt:
-            continue
+    # Schritt 1: Tarif-Limitierung
+    res_tarif = berechne_limitierung(df, df_bwf, regeln, modus, laufzeit_jahre)
 
-        # Erstelle eine Maske fuer dieses Segment
-        maske = df[spalte] == wert
+    # Schritt 2: Personen-Cap auf die bereits limitierten Werte
+    erh_nach_tarif = res_tarif["erhoehung_limitiert_abs"].values
+    praemie_alt = df["praemie_alt_monatlich"].values
+    person_ids = df["person_id"].values
 
-        # Testphase: Verschaerfende Regeln fuer bessere Entlastung des Segments
-        for delta in [5, 10]:
-            neues_ziel = max(global_ziel - delta, 0)
+    erh_abs_neu, erh_p_vorher, erh_p_nachher, p_lim = _wende_personen_cap_an(
+        person_ids, erh_nach_tarif, praemie_alt,
+        person_ziel_abs, person_ziel_pct, verteilungsmodus,
+    )
 
-            neue_regel = {
-                "ziel_pct": float(neues_ziel),
-                "ziel_abs": None,
-                "scope_spalte": spalte,
-                "scope_werte": [wert],
-            }
+    # Aktualisiere Ergebnis-Spalten
+    res_tarif["erhoehung_limitiert_abs"] = np.round(erh_abs_neu, 2)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        res_tarif["erhoehung_limitiert_pct"] = np.round(
+            np.where(praemie_alt > 0, erh_abs_neu / praemie_alt * 100.0, 0.0), 2
+        )
+    res_tarif["praemie_limitiert"] = np.round(praemie_alt + erh_abs_neu, 2)
 
-            neue_regeln = [r.copy() for r in regeln] + [neue_regel]
-            res_neu = berechne_limitierung(df, df_bwf, neue_regeln, modus, laufzeit)
-            bedarf_neu = res_neu["einmaleinlage"].sum()
-            mehrkosten = bedarf_neu - bedarf_aktuell  # Positive Werte = zusaetzliche Kosten
+    # Differenz und Einmaleinlage neu berechnen
+    erh_abs_orig = df["erhoehung_absolut"].values
+    diff_monatlich = np.maximum(erh_abs_orig - erh_abs_neu, 0.0)
+    res_tarif["differenz_monatlich"] = np.round(diff_monatlich, 2)
 
-            # Nur signifikante Mehrkosten (> 10kEUR) beruecksichtigen
-            if mehrkosten > 10000:
-                entlastet = (
-                    res_neu.loc[maske.values, "erhoehung_limitiert_pct"]
-                    < aktuell.loc[maske.values, "erhoehung_limitiert_pct"] - 0.1
-                ).sum()
+    bwf_merged = df[["tarif_id", "geschlecht", "alter"]].merge(
+        df_bwf, on=["tarif_id", "geschlecht", "alter"], how="left"
+    )
+    bwf_werte = bwf_merged["barwertfaktor"].fillna(0).values
+    res_tarif["einmaleinlage"] = np.round(diff_monatlich * 12 * bwf_werte, 2)
+    res_tarif["limitiert"] = diff_monatlich > 0.01
 
-                # Nur Vorschlaege mit mindestens einer entlasteten Person
-                if entlastet > 0:
-                    vorschlaege.append({
-                        "typ": "teilbestand",
-                        "beschreibung": f"{label} '{wert}' zusaetzlich auf {neues_ziel:.0f}% begrenzen",
-                        "einsparung_eur": -mehrkosten,
-                        "betroffene": entlastet,
-                        "regel_index": len(regeln),
-                        "neue_regel": neue_regel,
-                    })
+    # Personen-Level-Spalten
+    res_tarif["erhoehung_person_gesamt_vorher"] = np.round(erh_p_vorher, 2)
+    res_tarif["erhoehung_person_gesamt_nachher"] = np.round(erh_p_nachher, 2)
+    res_tarif["person_limitiert"] = p_lim
 
-    # Sortiere nach Effizienzquotient: Entlastete pro Kosten-Euro (descending)
-    vorschlaege.sort(key=lambda x: x["betroffene"] / (abs(x["einsparung_eur"]) + 1), reverse=True)
-    return vorschlaege[:10]
+    n_person_lim = len(set(person_ids[p_lim]))
+    logger.info(
+        "Personen-Limitierung abgeschlossen: %d Personen limitiert, "
+        "RfB-Bedarf=%.2f Mio. €",
+        n_person_lim, res_tarif["einmaleinlage"].sum() / 1e6,
+    )
+
+    return res_tarif
+
+
+def _limitierung_person_dann_tarif(
+    df, df_bwf, regeln, person_ziel_abs, person_ziel_pct,
+    modus, laufzeit_jahre, verteilungsmodus,
+) -> pd.DataFrame:
+    """Erst Personen-Cap auf Original-Werte, dann Tarif-Limitierung."""
+    logger.info("Reihenfolge: Personen-Cap → Tarif-Limitierung")
+
+    # Schritt 1: Personen-Cap auf die Original-Erhöhungen
+    erh_abs_orig = df["erhoehung_absolut"].values
+    praemie_alt = df["praemie_alt_monatlich"].values
+    person_ids = df["person_id"].values
+
+    erh_abs_nach_person, erh_p_vorher, erh_p_nachher, p_lim = _wende_personen_cap_an(
+        person_ids, erh_abs_orig, praemie_alt,
+        person_ziel_abs, person_ziel_pct, verteilungsmodus,
+    )
+
+    # Schritt 2: Erstelle modifizierten Bestand mit Personen-adjustierten Erhöhungen
+    df_mod = df.copy()
+    df_mod["erhoehung_absolut"] = np.round(erh_abs_nach_person, 2)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        df_mod["erhoehung_prozent"] = np.round(
+            np.where(praemie_alt > 0, erh_abs_nach_person / praemie_alt * 100.0, 0.0), 2
+        )
+    df_mod["praemie_neu_monatlich"] = np.round(praemie_alt + erh_abs_nach_person, 2)
+
+    # Schritt 3: Tarif-Limitierung auf die personen-adjustierten Werte
+    res_tarif = berechne_limitierung(df_mod, df_bwf, regeln, modus, laufzeit_jahre)
+
+    # Einmaleinlage basiert auf Differenz zu den Original-Erhöhungen
+    erh_abs_final = res_tarif["erhoehung_limitiert_abs"].values
+    diff_monatlich = np.maximum(erh_abs_orig - erh_abs_final, 0.0)
+    res_tarif["differenz_monatlich"] = np.round(diff_monatlich, 2)
+
+    bwf_merged = df[["tarif_id", "geschlecht", "alter"]].merge(
+        df_bwf, on=["tarif_id", "geschlecht", "alter"], how="left"
+    )
+    bwf_werte = bwf_merged["barwertfaktor"].fillna(0).values
+    res_tarif["einmaleinlage"] = np.round(diff_monatlich * 12 * bwf_werte, 2)
+    res_tarif["limitiert"] = diff_monatlich > 0.01
+
+    # Personen-Level-Spalten
+    res_tarif["erhoehung_person_gesamt_vorher"] = np.round(erh_p_vorher, 2)
+    res_tarif["erhoehung_person_gesamt_nachher"] = np.round(erh_p_nachher, 2)
+    res_tarif["person_limitiert"] = p_lim
+
+    n_person_lim = len(set(person_ids[p_lim]))
+    logger.info(
+        "Personen-Limitierung (person_zuerst) abgeschlossen: %d Personen limitiert, "
+        "RfB-Bedarf=%.2f Mio. €",
+        n_person_lim, res_tarif["einmaleinlage"].sum() / 1e6,
+    )
+
+    return res_tarif

@@ -54,6 +54,7 @@ from services.limitierung import (
     berechne_barwertfaktoren as berechne_barwertfaktoren_service,                       # Leibrentenbarwerte (unbefristet)
     berechne_barwertfaktoren_befristet as berechne_barwertfaktoren_befristet_service,   # Barwerte mit festem Zeithorizont
     berechne_limitierung as berechne_limitierung_service,       # Kernrechnung der Limitierung
+    berechne_limitierung_person as berechne_limitierung_person_service,   # Limitierung mit Personenebene
     berechne_sensitivitaet as berechne_sensitivitaet_service,   # Sensitivitätsanalyse über Parameterbereich
 )
 
@@ -91,6 +92,7 @@ GRUPPIER_DIMENSIONEN = {
     "Geschlecht": "geschlecht",
     "Altersgruppe": "altersgruppe",
     "Hist. Belastung": "hist_belastung",
+    "Person": "person_id",
 }
 
 # ── Adapter-Funktionen (leiten an Service-Schicht weiter) ───────────────────
@@ -336,6 +338,14 @@ def berechne_limitierung(_hash, df, df_bwf, regeln, modus, laufzeit_jahre):
     # Kernrechnung: wendet Limitierungsregeln auf jeden Versicherten an
     return berechne_limitierung_service(df, df_bwf, regeln, modus, laufzeit_jahre)
 
+@st.cache_data(show_spinner="Berechne Personen-Limitierung …")
+def berechne_limitierung_person(_hash, df, df_bwf, regeln, personen_regel, modus,
+                               laufzeit_jahre, reihenfolge, verteilungsmodus):
+    return berechne_limitierung_person_service(
+        df, df_bwf, regeln, personen_regel, modus, laufzeit_jahre,
+        reihenfolge=reihenfolge, verteilungsmodus=verteilungsmodus,
+    )
+
 @st.cache_data(show_spinner=False)
 def berechne_sensitivitaet(_hash, df, df_bwf, regeln_basis, modus, laufzeit):
     # Variiert einen Parameter über einen Wertebereich und berechnet je eine Limitierung
@@ -369,6 +379,7 @@ with tab_limitierung:
         berechne_barwertfaktoren,
         berechne_barwertfaktoren_befristet,
         berechne_limitierung,
+        berechne_limitierung_person,
         berechne_sensitivitaet,
         formatiere_euro,
         berechne_gitter,

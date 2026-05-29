@@ -86,6 +86,8 @@ def erzeuge_pkv_sterbetafel():
     
     # Bereinige Spalten: entferne Leerzeichen aus Spaltennamen
     df.columns = df.columns.str.strip()
+    # Entferne unbenannte Spalten (entstehen durch Trailing-Komma in CSV)
+    df = df.loc[:, ~df.columns.str.startswith("Unnamed")]
     df = df.dropna()
     
     # Konvertiere zu numerisch (fehlerhafte Werte werden NaN)
@@ -211,60 +213,111 @@ def erzeuge_bestand(df_tarife, mittlere_anpassung, rng):
         rng (np.random.Generator): Zufallsgenerator (für Reproduzierbarkeit)
     
     Returns:
-        pd.DataFrame: Versichertendaten mit 15 Spalten:
-            - versicherten_id, geburtsdatum, alter, geschlecht
+        pd.DataFrame: Versichertendaten mit 16 Spalten:
+            - person_id, versicherten_id, geburtsdatum, alter, geschlecht
             - tarifwerk, tarif_id, tarifart
             - versicherungsbeginn, versicherungsdauer_jahre
             - praemie_alt_monatlich, praemie_neu_monatlich
             - erhoehung_absolut, erhoehung_prozent
             - erhoehung_historisch_kumuliert, alterungsrueckstellung
     """
-    n = ANZAHL_VERSICHERTE
+    n_ziel = ANZAHL_VERSICHERTE
+    print("  Erzeuge Personen-Struktur (Voll + Modul) ...")
 
-    tarifwerk_wahl = rng.choice(["Classic", "Komfort", "Premium"], size=n, p=[0.25, 0.45, 0.30])
-    tarifart_wahl = rng.choice(["voll", "ambulant", "stationaer", "zahn"], size=n, p=[0.50, 0.20, 0.15, 0.15])
+    # --- 1. Person-Struktur bestimmen ---
+    # ~50% Voll-Tarif-Personen (genau 1 Tarif "voll" pro Person)
+    # ~50% Modul-Tarif-Personen (2-4 Tarife aus ambulant/stationaer/zahn, ggf. +voll)
+    n_voll_personen = n_ziel // 2
+    n_modul_zeilen_ziel = n_ziel - n_voll_personen
+
+    # Generiere Modul-Personen mit 2-4 Tarifen pro Person
+    modul_counts = []
+    total_modul = 0
+    while total_modul < n_modul_zeilen_ziel:
+        c = int(rng.choice([2, 3, 4], p=[0.40, 0.40, 0.20]))
+        if total_modul + c > n_modul_zeilen_ziel:
+            rest = n_modul_zeilen_ziel - total_modul
+            if rest >= 2:
+                modul_counts.append(rest)
+            break
+        modul_counts.append(c)
+        total_modul += c
+    modul_counts = np.array(modul_counts, dtype=int)
+    n_modul_personen = len(modul_counts)
+    n_personen_gesamt = n_voll_personen + n_modul_personen
+    print(f"    {n_voll_personen:,} Voll-Personen + {n_modul_personen:,} Modul-Personen "
+          f"({modul_counts.sum():,} Zeilen) = {n_voll_personen + modul_counts.sum():,} Zeilen gesamt")
+
+    # --- 2. Personen-Demographie generieren (identisch pro Person) ---
+    person_tarifwerk = rng.choice(["Classic", "Komfort", "Premium"],
+                                  size=n_personen_gesamt, p=[0.25, 0.45, 0.30])
+    alter_raw = rng.beta(4.0, 2.8, size=n_personen_gesamt)
+    person_alter = np.round(18 + alter_raw * 77).astype(int)
+    person_alter = np.clip(person_alter, 18, 95)
+    person_geschlecht = rng.choice(["M", "W"], size=n_personen_gesamt, p=[0.55, 0.45])
+
+    person_geburtsjahre = STICHTAG.year - person_alter
+    person_geburtsdaten = np.array([
+        date(int(j), 1, 1) + timedelta(days=int(t))
+        for j, t in zip(person_geburtsjahre, rng.integers(0, 365, size=n_personen_gesamt))
+    ])
+
+    mc_p = person_tarifwerk == "Classic"
+    mk_p = person_tarifwerk == "Komfort"
+    mp_p = person_tarifwerk == "Premium"
+    person_vd = np.zeros(n_personen_gesamt, dtype=int)
+    person_vd[mc_p] = rng.integers(15, 40, size=mc_p.sum())
+    person_vd[mk_p] = rng.integers(5, 25, size=mk_p.sum())
+    person_vd[mp_p] = rng.integers(1, 12, size=mp_p.sum())
+    person_vd = np.minimum(person_vd, np.maximum(person_alter - 18, 1))
+
+    person_vb_j = STICHTAG.year - person_vd
+    person_vb = np.array([
+        date(int(j), 1, 1) + timedelta(days=int(rng.integers(0, 365)))
+        for j in person_vb_j
+    ])
+
+    # --- 3. Expand Personen → Zeilen (np.repeat für Demographie) ---
+    # Voll-Personen haben 1 Zeile, Modul-Personen haben modul_counts[k] Zeilen
+    counts_per_person = np.concatenate([np.ones(n_voll_personen, dtype=int), modul_counts])
+    n = int(counts_per_person.sum())
+
+    person_id_labels = np.array([f"P{i:07d}" for i in range(1, n_personen_gesamt + 1)])
+    person_id_expanded = np.repeat(person_id_labels, counts_per_person)
+
+    tarifwerk_wahl = np.repeat(person_tarifwerk, counts_per_person)
+    alter = np.repeat(person_alter, counts_per_person)
+    geschlecht = np.repeat(person_geschlecht, counts_per_person)
+    geburtsdaten = np.repeat(person_geburtsdaten, counts_per_person)
+    vd = np.repeat(person_vd, counts_per_person)
+    versicherungsbeginn = np.repeat(person_vb, counts_per_person)
+
+    # --- 4. Tarifart-Zuweisung ---
+    # Voll-Personen: tarifart = "voll"
+    # Modul-Personen: 2-4 distinkte Tarifarten aus {ambulant, stationaer, zahn, voll}
+    tarifart_wahl = np.empty(n, dtype=object)
+    tarifart_wahl[:n_voll_personen] = "voll"
+
+    modul_offsets = n_voll_personen + np.concatenate([[0], np.cumsum(modul_counts[:-1])])
+    modul_arten = ["ambulant", "stationaer", "zahn"]
+    for k, count in enumerate(modul_counts):
+        o = modul_offsets[k]
+        if count == 4:
+            arts = list(rng.permutation(modul_arten + ["voll"]))
+        elif count == 3:
+            arts = list(rng.permutation(modul_arten))
+        else:
+            chosen = rng.choice(modul_arten, size=count, replace=False)
+            arts = list(chosen)
+        tarifart_wahl[o:o + count] = arts
+
     prefix_map = {"Classic": "CL", "Komfort": "KO", "Premium": "PR"}
     art_map = {"voll": "VOLL", "ambulant": "AMB", "stationaer": "STAT", "zahn": "ZAHN"}
     tarif_ids = np.array([f"{prefix_map[tw]}-{art_map[ta]}" for tw, ta in zip(tarifwerk_wahl, tarifart_wahl)])
 
-    # --- 2. Alter — Beta-Verteilung für realistische Altersstruktur ---
-    # Beta(4.0, 2.8) ist rechtsschief → mehr ältere Versicherte als Junge
-    # Realistisch für PKV (höhere Alterskonzentration)
-    alter_raw = rng.beta(4.0, 2.8, size=n)
-    # Skaliere auf Bereich 18-95 Jahre (Mindesteintrittsalter 18, kaum 100+)
-    alter = np.round(18 + alter_raw * 77).astype(int)  # 18 bis 95
-    alter = np.clip(alter, 18, 95)  # Sicherstelle Gültigkeitsbereich
-
-    # Berechne Geburtsdaten: zufälliger Tag im Geburtsjahr
-    geburtsjahre = STICHTAG.year - alter
-    geburtsdaten = np.array([
-        date(int(j), 1, 1) + timedelta(days=int(t))  # 1.1. + random Tage
-        for j, t in zip(geburtsjahre, rng.integers(0, 365, size=n))
-    ])
-
-    # --- 3. Geschlecht (55% Männer, 45% Frauen, realistische PKV-Quote) ---
-    geschlecht = rng.choice(["M", "W"], size=n, p=[0.55, 0.45])
-
-    # --- 4. Versicherungsdauer (Tarifwerk-abhängig) ---
-    # Classic: lange Bindung (15-40 Jahre, nicht zu häufig gewechselt)
-    # Komfort: mittel (5-25 Jahre)
-    # Premium: höhere Fluktuation (1-12 Jahre, neuere Tarife)
     mc = tarifwerk_wahl == "Classic"
     mk = tarifwerk_wahl == "Komfort"
     mp = tarifwerk_wahl == "Premium"
-    vd = np.zeros(n, dtype=int)
-    vd[mc] = rng.integers(15, 40, size=mc.sum())
-    vd[mk] = rng.integers(5, 25, size=mk.sum())
-    vd[mp] = rng.integers(1, 12, size=mp.sum())
-    # Clipping: Versicherungsdauer kann max. (Alter - 18) sein
-    vd = np.minimum(vd, np.maximum(alter - 18, 1))
-    
-    # Berechne Versicherungsbeginn-Datum rückwärts
-    vb_j = STICHTAG.year - vd
-    versicherungsbeginn = np.array([
-        date(int(j), 1, 1) + timedelta(days=int(rng.integers(0, 365)))
-        for j in vb_j
-    ])
 
     # --- 5. Bisherige Monatsprämie (komplexe Multiplikativ-Faktorenlogik) ---
     # Basis: je Tarifart (Ärztegebühren, Krankenhaus, Zahnersatz)
@@ -473,6 +526,7 @@ def erzeuge_bestand(df_tarife, mittlere_anpassung, rng):
     # Rückgabeformat ist die zentrale Schnittstelle für alle Downstream-Analysen
     print("  Baue DataFrame ...")
     return pd.DataFrame({
+        "person_id": person_id_expanded,
         "versicherten_id": [f"V{i:07d}" for i in range(1, n + 1)],
         "geburtsdatum": geburtsdaten,
         "alter": alter,
@@ -526,6 +580,13 @@ def zeige_statistiken(df, df_t, df_ao):
     print("ZUSAMMENFASSUNG (v4)")
     print("=" * 70)
     print(f"\n  Versicherte:        {len(df):>12,}")
+    if "person_id" in df.columns:
+        n_personen = df["person_id"].nunique()
+        tarife_pro_person = df.groupby("person_id").size()
+        print(f"  Personen:           {n_personen:>12,}")
+        print(f"  Ø Tarife/Person:    {tarife_pro_person.mean():>12.2f}")
+        print(f"  Personen 1 Tarif:   {(tarife_pro_person == 1).sum():>12,}")
+        print(f"  Personen >1 Tarif:  {(tarife_pro_person > 1).sum():>12,}")
     print(f"  Ø Alter:            {df['alter'].mean():>12.1f}")
     print(f"  Altersbereich:      {df['alter'].min():>5} - {df['alter'].max()}")
     print(f"  Anteil männlich:    {(df['geschlecht'] == 'M').mean():>12.1%}")

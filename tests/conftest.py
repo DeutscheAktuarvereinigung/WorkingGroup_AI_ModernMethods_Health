@@ -25,6 +25,26 @@ def bestand_klein():
 
 
 @pytest.fixture
+def bestand_mit_personen():
+    """Testbestand mit person_id — 3 Personen, wobei Person P001 und P002 je 2 Tarife haben."""
+    return pd.DataFrame({
+        "person_id": ["P001", "P001", "P002", "P002", "P003", "P003"],
+        "versicherten_id": ["V001", "V002", "V003", "V004", "V005", "V006"],
+        "alter": [45, 45, 60, 60, 35, 35],
+        "geschlecht": ["M", "M", "W", "W", "M", "M"],
+        "tarifwerk": ["Classic", "Classic", "Komfort", "Komfort", "Premium", "Premium"],
+        "tarif_id": ["CL-AMB", "CL-STAT", "KO-AMB", "KO-STAT", "PR-AMB", "PR-STAT"],
+        "tarifart": ["ambulant", "stationaer", "ambulant", "stationaer", "ambulant", "stationaer"],
+        "praemie_alt_monatlich": [200.0, 350.0, 180.0, 400.0, 150.0, 300.0],
+        "praemie_neu_monatlich": [260.0, 455.0, 216.0, 480.0, 165.0, 345.0],
+        "erhoehung_absolut": [60.0, 105.0, 36.0, 80.0, 15.0, 45.0],
+        "erhoehung_prozent": [30.0, 30.0, 20.0, 20.0, 10.0, 15.0],
+        "alterungsrueckstellung": [5000.0, 15000.0, 3000.0, 20000.0, 25000.0, 18000.0],
+        "versicherungsdauer_jahre": [5, 15, 3, 8, 30, 20],
+    })
+
+
+@pytest.fixture
 def bestand_mit_altersgruppen(bestand_klein):
     """Bestand mit Altersgruppen-Spalte."""
     from services.data_loader import erzeuge_altersgruppen

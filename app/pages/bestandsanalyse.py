@@ -216,8 +216,10 @@ def render_bestandsanalyse(df_gefiltert, _farb_map_dynamisch, _geschlecht_label,
     st.markdown("### Statistische Übersicht")
     st.caption("Wählen Sie eine oder mehrere Dimensionen, nach denen die Statistiken gruppiert werden sollen.")
 
-    gew_gruppierung = st.multiselect("Gruppieren nach", list(GRUPPIER_DIMENSIONEN.keys()), default=["Tarifwerk"], key="stat_gruppierung")
-    gruppen_spalten = tuple(GRUPPIER_DIMENSIONEN[g] for g in gew_gruppierung)
+    # Nur Dimensionen anbieten, deren Spalte im DataFrame vorhanden ist
+    verfuegbare_dims = {k: v for k, v in GRUPPIER_DIMENSIONEN.items() if v in df.columns}
+    gew_gruppierung = st.multiselect("Gruppieren nach", list(verfuegbare_dims.keys()), default=["Tarifwerk"], key="stat_gruppierung")
+    gruppen_spalten = tuple(verfuegbare_dims[g] for g in gew_gruppierung)
 
     stat_df = berechne_interaktive_statistik(h, df, gruppen_spalten)
 

@@ -30,6 +30,7 @@ def render_limitierung(
     berechne_barwertfaktoren,
     berechne_barwertfaktoren_befristet,
     berechne_limitierung,
+    berechne_limitierung_person,
     berechne_sensitivitaet,
     formatiere_euro,
     berechne_gitter,
@@ -196,7 +197,8 @@ def render_limitierung(
                         )
                         regeln[idx]["ziel_abs"] = abs_val if abs_val > 0 else None
                     with rc3:
-                        scope_optionen = ["Alle"] + list(GRUPPIER_DIMENSIONEN.keys())
+                        scope_dims = {k: v for k, v in GRUPPIER_DIMENSIONEN.items() if v in df_lim.columns}
+                        scope_optionen = ["Alle"] + list(scope_dims.keys())
                         scope_wahl = st.selectbox(
                             "Scope", scope_optionen, index=0, key=f"r_scope_{idx}",
                         )
@@ -205,7 +207,7 @@ def render_limitierung(
                             regeln[idx]["scope_werte"] = None
                     with rc4:
                         if scope_wahl != "Alle":
-                            spalte = GRUPPIER_DIMENSIONEN[scope_wahl]
+                            spalte = scope_dims[scope_wahl]
                             regeln[idx]["scope_spalte"] = spalte
                             alle_werte = sorted(df_lim[spalte].unique())
                             regeln[idx]["scope_werte"] = st.multiselect(
@@ -225,6 +227,69 @@ def render_limitierung(
                 regeln.append({"ziel_pct": 20.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None})
                 st.session_state["regeln"] = regeln
                 st.rerun()
+
+        # === PERSONEN-LIMITIERUNG ===
+        hat_person_id = "person_id" in df_lim.columns
+        with st.expander("👥 Personen-Limitierung (Gesamtbeitrag pro Person)", expanded=False):
+            if not hat_person_id:
+                st.info("Die geladenen Daten enthalten keine `person_id`-Spalte. "
+                        "Personen-Limitierung ist nur möglich, wenn Tarife einer Person zugeordnet sind.")
+                personen_aktiv = False
+            else:
+                n_personen = df_lim["person_id"].nunique()
+                tarife_pro_person = df_lim.groupby("person_id").size()
+                multi_tarif = (tarife_pro_person > 1).sum()
+                st.caption(
+                    f"**{n_personen:,}** Personen im Bestand, davon **{multi_tarif:,}** "
+                    f"mit mehr als einem Tarif (Ø {tarife_pro_person.mean():.1f} Tarife/Person)."
+                )
+
+                personen_aktiv = st.checkbox("Personen-Limitierung aktivieren", value=False,
+                                             key="personen_lim_aktiv")
+
+                if personen_aktiv:
+                    pc1, pc2 = st.columns(2)
+                    with pc1:
+                        person_ziel_abs = st.number_input(
+                            "Max. Gesamterhöhung (€/Mon pro Person)",
+                            min_value=0.0, max_value=5000.0, value=0.0, step=10.0,
+                            key="person_ziel_abs", format="%.0f",
+                            help="Maximale Summe aller Tariferhöhungen einer Person. 0 = kein Limit.",
+                        )
+                        person_ziel_abs = person_ziel_abs if person_ziel_abs > 0 else None
+
+                    with pc2:
+                        person_ziel_pct = st.number_input(
+                            "Max. Gesamterhöhung (% der Gesamtprämie)",
+                            min_value=0.0, max_value=200.0, value=0.0, step=1.0,
+                            key="person_ziel_pct", format="%.1f",
+                            help="Maximale Summe aller Erhöhungen, ausgedrückt als Prozent "
+                                 "der gesamten Altprämie der Person. 0 = kein Limit.",
+                        )
+                        person_ziel_pct = person_ziel_pct if person_ziel_pct > 0 else None
+
+                    pc3, pc4 = st.columns(2)
+                    with pc3:
+                        verteilungsmodus = st.selectbox(
+                            "Verteilungsmodus",
+                            ["proportional", "groesster_zuerst"],
+                            index=0, key="verteilungsmodus",
+                            help="**proportional**: Reduktion proportional zur Einzeltarif-Erhöhung. "
+                                 "**groesster_zuerst**: Tarif mit höchster Erhöhung wird zuerst reduziert.",
+                        )
+                    with pc4:
+                        reihenfolge = st.selectbox(
+                            "Reihenfolge",
+                            ["tarif_zuerst", "person_zuerst"],
+                            index=0, key="reihenfolge",
+                            help="**tarif_zuerst**: Erst Tarif-Caps anwenden, dann Personen-Cap. "
+                                 "**person_zuerst**: Erst Personen-Cap, dann Tarif-Caps.",
+                        )
+
+                    st.session_state["personen_regel"] = {
+                        "ziel_abs": person_ziel_abs,
+                        "ziel_pct": person_ziel_pct,
+                    }
 
         st.markdown("---")
 
@@ -283,11 +348,23 @@ def render_limitierung(
         if st.button("🔄 Limitierung berechnen", type="primary", use_container_width=True):
             aktive_regeln = [r for r in regeln if r.get("ziel_pct") or r.get("ziel_abs")]
 
-            if not aktive_regeln:
+            if not aktive_regeln and not (hat_person_id and personen_aktiv):
                 st.warning("Bitte definieren Sie mindestens eine Regel.")
             else:
                 lim_hash = df_hash(df_lim)
-                res = berechne_limitierung(lim_hash, df_lim, df_bwf, aktive_regeln, modus_key, laufzeit)
+
+                # Personen-Limitierung, wenn aktiviert und person_id vorhanden
+                if hat_person_id and personen_aktiv:
+                    personen_regel = st.session_state.get("personen_regel", {})
+                    v_modus = st.session_state.get("verteilungsmodus", "proportional")
+                    rf = st.session_state.get("reihenfolge", "tarif_zuerst")
+                    res = berechne_limitierung_person(
+                        lim_hash, df_lim, df_bwf, aktive_regeln, personen_regel,
+                        modus_key, laufzeit, rf, v_modus,
+                    )
+                else:
+                    res = berechne_limitierung(lim_hash, df_lim, df_bwf, aktive_regeln, modus_key, laufzeit)
+
                 st.session_state["lim_result"] = res
                 st.session_state["lim_regeln_snapshot"] = aktive_regeln
                 st.session_state["lim_budget"] = budget
@@ -328,6 +405,29 @@ def render_limitierung(
                 st.metric("Max. Erhöhung nachher (€)", f"{res['erhoehung_limitiert_abs'].max():.0f} €/Mon")
             with m8:
                 st.metric("Ø Erhöhung nachher (€)", f"{res['erhoehung_limitiert_abs'].mean():.0f} €/Mon")
+
+            # --- Personen-KPIs (wenn Personen-Limitierung aktiv) ---
+            if "person_limitiert" in res.columns and res["person_limitiert"].any():
+                st.markdown("**Personen-Limitierung**")
+                pm1, pm2, pm3, pm4 = st.columns(4)
+                person_ids_lim = df_lim_aktuell.loc[res["person_limitiert"].values, "person_id"]
+                n_personen_lim = person_ids_lim.nunique()
+                n_personen_gesamt = df_lim_aktuell["person_id"].nunique() if "person_id" in df_lim_aktuell.columns else 0
+                with pm1:
+                    st.metric("Personen limitiert",
+                              f"{n_personen_lim:,}" + (f" ({n_personen_lim / n_personen_gesamt:.1%})" if n_personen_gesamt > 0 else ""))
+                with pm2:
+                    avg_entlastung = res.loc[res["person_limitiert"], "differenz_monatlich"].mean()
+                    st.metric("Ø Entlastung/Tarif (Person)", f"{avg_entlastung:.0f} €/Mon")
+                with pm3:
+                    rfb_person = res.loc[res["person_limitiert"], "einmaleinlage"].sum()
+                    st.metric("RfB Personen-Lim.", formatiere_euro(rfb_person))
+                with pm4:
+                    if "erhoehung_person_gesamt_nachher" in res.columns:
+                        max_person_erh = res.groupby(
+                            df_lim_aktuell["person_id"]
+                        )["erhoehung_limitiert_abs"].sum().max()
+                        st.metric("Max. Pers.-Erhöhung", f"{max_person_erh:.0f} €/Mon")
 
             st.markdown("---")
 
