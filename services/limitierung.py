@@ -6,6 +6,57 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+def _barwertfaktoren_fuer_kombination(
+    qx_arr: np.ndarray,
+    wx_arr: np.ndarray,
+    v: float,
+    laufzeit_jahre: int | None = None,
+) -> np.ndarray:
+    """Berechnet Barwertfaktoren je Eintrittsalter für eine Tarif/Geschlecht-Kombination."""
+    # Kombinierte Ausscheidewahrscheinlichkeit pro Alter auf [0, 1] begrenzen
+    ausch_arr = np.minimum(qx_arr + wx_arr, 1.0)
+    max_alter = len(ausch_arr)
+    result = np.zeros(max_alter, dtype=float)
+
+    max_horizon = max_alter - 1
+    if laufzeit_jahre is not None:
+        max_horizon = min(max_horizon, laufzeit_jahre)
+    if max_horizon <= 0:
+        return np.round(result, 6)
+
+    diskont_pows = v ** np.arange(1, max_horizon + 1, dtype=float)
+
+    for x in range(max_alter):
+        restjahre = max_alter - x - 1
+        if restjahre <= 0:
+            continue
+
+        if laufzeit_jahre is None:
+            horizon = restjahre
+        else:
+            horizon = min(laufzeit_jahre, restjahre)
+        if horizon <= 0:
+            continue
+
+        surv = 1.0 - ausch_arr[x:x + horizon]
+        tp = np.cumprod(surv)
+
+        # Entspricht exakt der bisherigen Abbruchlogik: sobald tp < 1e-10,
+        # wird dieser und alle folgenden Terme nicht mehr berücksichtigt.
+        ungueltig = tp < 1e-10
+        if np.any(ungueltig):
+            valid_len = int(np.argmax(ungueltig))
+        else:
+            valid_len = horizon
+
+        if valid_len <= 0:
+            continue
+
+        result[x] = float(np.dot(diskont_pows[:valid_len], tp[:valid_len]))
+
+    return np.round(result, 6)
+
+
 def berechne_barwertfaktoren(df_ao: pd.DataFrame, df_tarife: pd.DataFrame) -> pd.DataFrame:
     """
     Berechnet Barwertfaktoren (Annuitätenfaktoren) für jede Tarifart, Geschlecht und Alter.
@@ -40,58 +91,36 @@ def berechne_barwertfaktoren(df_ao: pd.DataFrame, df_tarife: pd.DataFrame) -> pd
     """
     logger.info("Berechne Barwertfaktoren: %d Tarife, %d AO-Einträge", len(df_tarife), len(df_ao))
     ergebnisse = []
+    ao_sorted = df_ao.sort_values(["tarif_id", "geschlecht", "alter"])
 
-    # Iteriere über alle Tarife
-    for _, tarif in df_tarife.iterrows():
-        tid = tarif["tarif_id"]
-        i = tarif["rechnungszins"]  # Rechnungszins als Dezimalzahl (z.B. 0.025)
-        v = 1.0 / (1.0 + i)  # Diskontierungsfaktor für zukünftige Zahlungsströme
+    # Gruppiere AO-Daten einmalig statt wiederholt zu filtern
+    ao_groups: dict[tuple[str, str], tuple[np.ndarray, np.ndarray]] = {}
+    for (tid, geschl), grp in ao_sorted.groupby(["tarif_id", "geschlecht"], sort=False):
+        ao_groups[(tid, geschl)] = (
+            grp["qx"].to_numpy(dtype=float),
+            grp["storno"].to_numpy(dtype=float),
+        )
 
-        # Berechne Barwertfaktoren für beide Geschlechter separat
+    for tarif in df_tarife.itertuples(index=False):
+        tid = tarif.tarif_id
+        i = tarif.rechnungszins
+        v = 1.0 / (1.0 + i)
+
         for geschl in ["M", "W"]:
-            # Hole alle Ausscheidedaten für diesen Tarif und dieses Geschlecht, sortiert nach Alter
-            ao_teil = df_ao[(df_ao["tarif_id"] == tid) & (df_ao["geschlecht"] == geschl)].sort_values("alter")
-            
-            # Überspringe, wenn keine Daten für diese Kombination vorhanden sind
-            if len(ao_teil) == 0:
+            ao_data = ao_groups.get((tid, geschl))
+            if ao_data is None:
                 continue
 
-            # Extrahiere Sterbe- und Stornowahrscheinlichkeiten als Arrays
-            qx_arr = ao_teil["qx"].values
-            wx_arr = ao_teil["storno"].values
-            max_alter = len(qx_arr)  # Maximales Alter in der Ausscheideordnung
+            qx_arr, wx_arr = ao_data
+            barwerte = _barwertfaktoren_fuer_kombination(qx_arr, wx_arr, v)
+            max_alter = len(barwerte)
 
-            # Berechne Barwertfaktor für jedes Eintrittsalter
-            for x in range(max_alter):
-                ax = 0.0  # Akkumulator für den Barwertfaktor
-                tp = 1.0  # Überlebenwahrscheinlichkeit vom Eintrittsalter bis Jahr t
-                
-                # Summiere über alle zukünftigen Jahre
-                for t in range(1, max_alter - x):
-                    alter_idx = x + t - 1
-                    if alter_idx >= max_alter:
-                        break
-                    
-                    # Kombinierte Ausscheidewahrscheinlichkeit (Sterbe- + Stornowahrscheinlichkeit)
-                    ausch = min(qx_arr[alter_idx] + wx_arr[alter_idx], 1.0)
-                    
-                    # Aktualisiere die kumulierte Überlebenwahrscheinlichkeit
-                    tp *= (1.0 - ausch)
-                    
-                    # Abbruchbedingung: wenn weitere Beiträge zu negligabel sind
-                    if tp < 1e-10:
-                        break
-                    
-                    # Addiere den abgezinsten Überlebenanteil
-                    ax += (v ** t) * tp
-
-                # Speichere Ergebnis für dieses Tarif-Geschlecht-Alter-Tripel
-                ergebnisse.append({
-                    "tarif_id": tid,
-                    "geschlecht": geschl,
-                    "alter": x,
-                    "barwertfaktor": round(ax, 6),
-                })
+            ergebnisse.extend({
+                "tarif_id": tid,
+                "geschlecht": geschl,
+                "alter": x,
+                "barwertfaktor": barwerte[x],
+            } for x in range(max_alter))
 
     return pd.DataFrame(ergebnisse)
 
@@ -112,40 +141,37 @@ def berechne_barwertfaktoren_befristet(df_ao: pd.DataFrame, df_tarife: pd.DataFr
         DataFrame mit tarif_id, geschlecht, alter, barwertfaktor_befristet
     """
     ergebnisse = []
+    ao_sorted = df_ao.sort_values(["tarif_id", "geschlecht", "alter"])
 
-    for _, tarif in df_tarife.iterrows():
-        tid = tarif["tarif_id"]
-        i = tarif["rechnungszins"]
+    ao_groups: dict[tuple[str, str], tuple[np.ndarray, np.ndarray]] = {}
+    for (tid, geschl), grp in ao_sorted.groupby(["tarif_id", "geschlecht"], sort=False):
+        ao_groups[(tid, geschl)] = (
+            grp["qx"].to_numpy(dtype=float),
+            grp["storno"].to_numpy(dtype=float),
+        )
+
+    for tarif in df_tarife.itertuples(index=False):
+        tid = tarif.tarif_id
+        i = tarif.rechnungszins
         v = 1.0 / (1.0 + i)
 
         for geschl in ["M", "W"]:
-            ao_teil = df_ao[(df_ao["tarif_id"] == tid) & (df_ao["geschlecht"] == geschl)].sort_values("alter")
-            if len(ao_teil) == 0:
+            ao_data = ao_groups.get((tid, geschl))
+            if ao_data is None:
                 continue
 
-            qx_arr = ao_teil["qx"].values
-            wx_arr = ao_teil["storno"].values
-            max_alter = len(qx_arr)
+            qx_arr, wx_arr = ao_data
+            barwerte_bef = _barwertfaktoren_fuer_kombination(
+                qx_arr, wx_arr, v, laufzeit_jahre=laufzeit_jahre,
+            )
+            max_alter = len(barwerte_bef)
 
-            for x in range(max_alter):
-                ax = 0.0
-                tp = 1.0
-                for t in range(1, min(laufzeit_jahre + 1, max_alter - x)):
-                    alter_idx = x + t - 1
-                    if alter_idx >= max_alter:
-                        break
-                    ausch = min(qx_arr[alter_idx] + wx_arr[alter_idx], 1.0)
-                    tp *= (1.0 - ausch)
-                    if tp < 1e-10:
-                        break
-                    ax += (v ** t) * tp
-
-                ergebnisse.append({
-                    "tarif_id": tid,
-                    "geschlecht": geschl,
-                    "alter": x,
-                    "barwertfaktor_befristet": round(ax, 6),
-                })
+            ergebnisse.extend({
+                "tarif_id": tid,
+                "geschlecht": geschl,
+                "alter": x,
+                "barwertfaktor_befristet": barwerte_bef[x],
+            } for x in range(max_alter))
 
     return pd.DataFrame(ergebnisse)
 
@@ -176,6 +202,14 @@ def _erzeuge_regel_beschreibungen(regeln: list) -> list[str]:
 
         beschreibungen.append(f"Regel {i + 1}: {scope_text} {ziel_text}")
     return beschreibungen
+
+
+def _ermittle_bwf_werte(df: pd.DataFrame, df_bwf: pd.DataFrame) -> np.ndarray:
+    """Ermittelt Barwertfaktor-Werte je Bestandszeile über einen Merge auf Schlüsseln."""
+    bwf_merged = df[["tarif_id", "geschlecht", "alter"]].merge(
+        df_bwf, on=["tarif_id", "geschlecht", "alter"], how="left"
+    )
+    return bwf_merged["barwertfaktor"].fillna(0).values
 
 
 def berechne_limitierung(df: pd.DataFrame, df_bwf: pd.DataFrame, regeln, modus, laufzeit_jahre) -> pd.DataFrame:
@@ -445,6 +479,7 @@ def berechne_limitierung_person(
 
     person_ziel_abs = personen_regel.get("ziel_abs")
     person_ziel_pct = personen_regel.get("ziel_pct")
+    bwf_werte = _ermittle_bwf_werte(df, df_bwf)
 
     if person_ziel_abs is None and person_ziel_pct is None:
         logger.warning("Personen-Regel enthält weder ziel_abs noch ziel_pct. "
@@ -459,12 +494,12 @@ def berechne_limitierung_person(
     if reihenfolge == "tarif_zuerst":
         return _limitierung_tarif_dann_person(
             df, df_bwf, regeln, person_ziel_abs, person_ziel_pct,
-            modus, laufzeit_jahre, verteilungsmodus,
+            modus, laufzeit_jahre, verteilungsmodus, bwf_werte,
         )
     elif reihenfolge == "person_zuerst":
         return _limitierung_person_dann_tarif(
             df, df_bwf, regeln, person_ziel_abs, person_ziel_pct,
-            modus, laufzeit_jahre, verteilungsmodus,
+            modus, laufzeit_jahre, verteilungsmodus, bwf_werte,
         )
     else:
         raise ValueError(f"Unbekannte Reihenfolge: '{reihenfolge}'. "
@@ -491,50 +526,61 @@ def _wende_personen_cap_an(
     """
     n = len(person_ids)
     erh_abs_neu = erh_abs.copy()
-    erh_person_vorher = np.zeros(n)
-    erh_person_nachher = np.zeros(n)
-    person_limitiert = np.zeros(n, dtype=bool)
 
-    # Gruppiere nach person_id
-    df_temp = pd.DataFrame({
-        "person_id": person_ids,
-        "erh_abs": erh_abs,
-        "praemie_alt": praemie_alt,
-        "_idx": np.arange(n),
-    })
+    unique_persons, inverse = np.unique(person_ids, return_inverse=True)
+    n_persons = len(unique_persons)
 
-    for pid, grp in df_temp.groupby("person_id"):
-        idx = grp["_idx"].values
-        erh_gruppe = erh_abs_neu[idx]
-        praemie_gruppe = grp["praemie_alt"].values
+    # Personen-Summen (vor Cap) einmalig berechnen
+    sum_erh = np.bincount(inverse, weights=erh_abs_neu, minlength=n_persons)
+    sum_praemie = np.bincount(inverse, weights=praemie_alt, minlength=n_persons)
 
-        gesamt_erh = erh_gruppe.sum()
-        gesamt_praemie = praemie_gruppe.sum()
-        erh_person_vorher[idx] = gesamt_erh
+    # Effektiven Cap je Person bestimmen (ziel_abs und ziel_pct wirken unabhängig)
+    cap = np.full(n_persons, np.inf, dtype=float)
+    if ziel_abs is not None:
+        cap = np.minimum(cap, float(ziel_abs))
+    if ziel_pct is not None:
+        cap_pct = np.where(sum_praemie > 0, sum_praemie * float(ziel_pct) / 100.0, np.inf)
+        cap = np.minimum(cap, cap_pct)
 
-        # Bestimme effektiven Cap
-        cap = np.inf
-        if ziel_abs is not None:
-            cap = min(cap, ziel_abs)
-        if ziel_pct is not None and gesamt_praemie > 0:
-            cap = min(cap, gesamt_praemie * ziel_pct / 100.0)
+    group_limitiert = (sum_erh > cap) & np.isfinite(cap)
 
-        if gesamt_erh <= cap or cap == np.inf:
-            erh_person_nachher[idx] = gesamt_erh
-            continue
+    erh_person_vorher = sum_erh[inverse]
+    erh_person_nachher_vals = np.where(group_limitiert, cap, sum_erh)
+    erh_person_nachher = erh_person_nachher_vals[inverse]
+    person_limitiert = group_limitiert[inverse]
 
-        # Überschuss verteilen
-        person_limitiert[idx] = True
-        reduktion = gesamt_erh - cap
+    if verteilungsmodus == "proportional":
+        reduktion = np.where(group_limitiert, sum_erh - cap, 0.0)
+        reduktion_row = reduktion[inverse]
+        sum_erh_row = sum_erh[inverse]
 
-        if verteilungsmodus == "proportional":
-            erh_abs_neu[idx] = _verteile_proportional(erh_gruppe, reduktion)
-        elif verteilungsmodus == "groesster_zuerst":
-            erh_abs_neu[idx] = _verteile_groesster_zuerst(erh_gruppe, reduktion)
-        else:
-            raise ValueError(f"Unbekannter Verteilungsmodus: '{verteilungsmodus}'.")
+        with np.errstate(divide="ignore", invalid="ignore"):
+            anteilige_reduktion = np.where(
+                sum_erh_row > 0,
+                reduktion_row * (erh_abs_neu / sum_erh_row),
+                0.0,
+            )
+        erh_abs_neu = np.maximum(erh_abs_neu - anteilige_reduktion, 0.0)
 
-        erh_person_nachher[idx] = erh_abs_neu[idx].sum()
+    elif verteilungsmodus == "groesster_zuerst":
+        # Nur limitierte Personen iterieren; Gruppierung rein per NumPy statt DataFrame.groupby.
+        order = np.argsort(inverse, kind="stable")
+        inv_sorted = inverse[order]
+        grenzen = np.flatnonzero(np.diff(inv_sorted)) + 1
+        starts = np.concatenate(([0], grenzen))
+        ends = np.concatenate((grenzen, [len(order)]))
+
+        for start, end in zip(starts, ends):
+            gid = int(inv_sorted[start])
+            if not group_limitiert[gid]:
+                continue
+            idx = order[start:end]
+            reduktion = sum_erh[gid] - cap[gid]
+            erh_abs_neu[idx] = _verteile_groesster_zuerst(erh_abs_neu[idx], reduktion)
+            erh_person_nachher[idx] = erh_abs_neu[idx].sum()
+
+    else:
+        raise ValueError(f"Unbekannter Verteilungsmodus: '{verteilungsmodus}'.")
 
     return erh_abs_neu, erh_person_vorher, erh_person_nachher, person_limitiert
 
@@ -567,7 +613,7 @@ def _verteile_groesster_zuerst(erh_gruppe: np.ndarray, reduktion: float) -> np.n
 
 def _limitierung_tarif_dann_person(
     df, df_bwf, regeln, person_ziel_abs, person_ziel_pct,
-    modus, laufzeit_jahre, verteilungsmodus,
+    modus, laufzeit_jahre, verteilungsmodus, bwf_werte,
 ) -> pd.DataFrame:
     """Erst Tarif-Limitierung, dann Personen-Cap auf limitierte Werte."""
     logger.info("Reihenfolge: Tarif-Limitierung → Personen-Cap")
@@ -598,10 +644,6 @@ def _limitierung_tarif_dann_person(
     diff_monatlich = np.maximum(erh_abs_orig - erh_abs_neu, 0.0)
     res_tarif["differenz_monatlich"] = np.round(diff_monatlich, 2)
 
-    bwf_merged = df[["tarif_id", "geschlecht", "alter"]].merge(
-        df_bwf, on=["tarif_id", "geschlecht", "alter"], how="left"
-    )
-    bwf_werte = bwf_merged["barwertfaktor"].fillna(0).values
     res_tarif["einmaleinlage"] = np.round(diff_monatlich * 12 * bwf_werte, 2)
     res_tarif["limitiert"] = diff_monatlich > 0.01
 
@@ -622,7 +664,7 @@ def _limitierung_tarif_dann_person(
 
 def _limitierung_person_dann_tarif(
     df, df_bwf, regeln, person_ziel_abs, person_ziel_pct,
-    modus, laufzeit_jahre, verteilungsmodus,
+    modus, laufzeit_jahre, verteilungsmodus, bwf_werte,
 ) -> pd.DataFrame:
     """Erst Personen-Cap auf Original-Werte, dann Tarif-Limitierung."""
     logger.info("Reihenfolge: Personen-Cap → Tarif-Limitierung")
@@ -654,10 +696,6 @@ def _limitierung_person_dann_tarif(
     diff_monatlich = np.maximum(erh_abs_orig - erh_abs_final, 0.0)
     res_tarif["differenz_monatlich"] = np.round(diff_monatlich, 2)
 
-    bwf_merged = df[["tarif_id", "geschlecht", "alter"]].merge(
-        df_bwf, on=["tarif_id", "geschlecht", "alter"], how="left"
-    )
-    bwf_werte = bwf_merged["barwertfaktor"].fillna(0).values
     res_tarif["einmaleinlage"] = np.round(diff_monatlich * 12 * bwf_werte, 2)
     res_tarif["limitiert"] = diff_monatlich > 0.01
 

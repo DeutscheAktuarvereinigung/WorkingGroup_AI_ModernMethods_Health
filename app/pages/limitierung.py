@@ -455,16 +455,24 @@ def render_limitierung(
                     help="Zeitraum in Jahren, für den die befristete Limitierung gilt.",
                 )
 
+            if "lim_befristet_bwf_cache" not in st.session_state:
+                st.session_state["lim_befristet_bwf_cache"] = {}
+
             if anteil_befristet > 0:
                 ao_hash_bef = df_hash(df_ao)
-                df_bwf_befristet = berechne_barwertfaktoren_befristet(
-                    ao_hash_bef, df_ao, df_tarife, befristung_jahre
-                )
+                lim_keys_hash = df_hash(df_lim_aktuell[["tarif_id", "geschlecht", "alter"]])
+                cache_key = (ao_hash_bef, befristung_jahre, lim_keys_hash)
+                bwf_bef_werte = st.session_state["lim_befristet_bwf_cache"].get(cache_key)
 
-                bwf_bef_merged = df_lim_aktuell[["tarif_id", "geschlecht", "alter"]].merge(
-                    df_bwf_befristet, on=["tarif_id", "geschlecht", "alter"], how="left"
-                )
-                bwf_bef_werte = bwf_bef_merged["barwertfaktor_befristet"].fillna(0).values
+                if bwf_bef_werte is None:
+                    df_bwf_befristet = berechne_barwertfaktoren_befristet(
+                        ao_hash_bef, df_ao, df_tarife, befristung_jahre
+                    )
+                    bwf_bef_merged = df_lim_aktuell[["tarif_id", "geschlecht", "alter"]].merge(
+                        df_bwf_befristet, on=["tarif_id", "geschlecht", "alter"], how="left"
+                    )
+                    bwf_bef_werte = bwf_bef_merged["barwertfaktor_befristet"].fillna(0).values
+                    st.session_state["lim_befristet_bwf_cache"][cache_key] = bwf_bef_werte
 
                 p = anteil_befristet / 100.0
                 diff_mon = res["differenz_monatlich"].values
