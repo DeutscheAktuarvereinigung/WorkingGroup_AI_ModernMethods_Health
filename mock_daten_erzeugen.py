@@ -521,7 +521,38 @@ def erzeuge_bestand(df_tarife, mittlere_anpassung, rng):
     # Finales Clipping: 0-80%
     erh_hist = np.clip(np.round(erh_hist, 1), 0.0, 80.0)
 
-    # --- 9. Konstruiere finales DataFrame mit allen Spalten ---
+    # --- 9. Mittelquellen fuer spaetere Topfsteuerung ---
+    # Ueberzins wird kunden-/tarifindividuell als externe Mittelspalte simuliert.
+    # Die Werte liegen bewusst in Einmaleinlagen-/Kapitalwertbasis vor und koennen
+    # in der spaeteren Limitierung regelunabhaengig vor den UI-Regeln verwendet werden.
+    print("  Erzeuge Mittelquellen (Ueberzins, ZU10) ...")
+    ueberzins_tarifwerk_faktor = np.ones(n)
+    ueberzins_tarifwerk_faktor[mc] = 0.80
+    ueberzins_tarifwerk_faktor[mk] = 1.00
+    ueberzins_tarifwerk_faktor[mp] = 1.20
+    ueberzins_streuung = np.clip(rng.lognormal(mean=0.0, sigma=0.35, size=n), 0.35, 2.25)
+    ueberzins_mittel = np.round(
+        np.maximum(erh_abs, 0.0) * 12 * ueberzins_tarifwerk_faktor * ueberzins_streuung,
+        2,
+    )
+
+    # ZU10-Mittel werden als Beispiel nur fuer Vollversicherte ab 65 erzeugt.
+    # Damit ist die Mockdatei bereits kompatibel mit dem Phase-A-Defaultfilter
+    # tarifart == voll und alter >= 65; alle anderen Zeilen erhalten 0.
+    zu10_berechtigt = (tarifart_wahl == "voll") & (alter >= 65)
+    zu10_horizont_faktor = np.clip((100 - alter) / 10.0, 1.0, 4.0)
+    zu10_streuung = rng.uniform(0.85, 1.15, size=n)
+    zu10_mittel = np.zeros(n)
+    zu10_mittel[zu10_berechtigt] = np.round(
+        praemie_alt[zu10_berechtigt]
+        * 12
+        * 0.10
+        * zu10_horizont_faktor[zu10_berechtigt]
+        * zu10_streuung[zu10_berechtigt],
+        2,
+    )
+
+    # --- 10. Konstruiere finales DataFrame mit allen Spalten ---
     # Kombiniere alle generierten Arrays in strukturiertes DataFrame
     # Rückgabeformat ist die zentrale Schnittstelle für alle Downstream-Analysen
     print("  Baue DataFrame ...")
@@ -542,7 +573,71 @@ def erzeuge_bestand(df_tarife, mittlere_anpassung, rng):
         "erhoehung_prozent": erh_pct,
         "erhoehung_historisch_kumuliert": erh_hist,
         "alterungsrueckstellung": ar,
+        "ueberzins_mittel_euro": ueberzins_mittel,
+        "zu10_mittel_euro": zu10_mittel,
     })
+
+
+def erzeuge_mittelquellen_config() -> pd.DataFrame:
+    """Erzeugt eine Beispiel-Konfiguration fuer Mittelquellen.
+
+    Die Datei dokumentiert die Phase-A-Defaults fuer spaetere UI- und
+    Service-Implementierungen. Sie wird noch nicht automatisch in der
+    Limitierungsrechnung verwendet.
+    """
+    return pd.DataFrame([
+        {
+            "quelle_id": "ueberzins",
+            "name": "Ueberzins kunden-/tarifindividuell",
+            "aktiv": True,
+            "prioritaet": 1,
+            "typ": "zeilenindividuell",
+            "betrag_euro": "",
+            "betrag_spalte": "ueberzins_mittel_euro",
+            "betrag_einheit": "einmaleinlage",
+            "unterliegt_limitierungsregeln": False,
+            "einsatzmodus": "pflicht_vollstaendig",
+            "anwendungsphase": "vor_regeln",
+            "filter_spalten": "",
+            "filter_operatoren": "",
+            "filter_werte": "",
+            "fallback_erlaubt": True,
+        },
+        {
+            "quelle_id": "zu10",
+            "name": "ZU10-Mittel Vollversicherung ab 65",
+            "aktiv": True,
+            "prioritaet": 2,
+            "typ": "zeilenindividuell",
+            "betrag_euro": "",
+            "betrag_spalte": "zu10_mittel_euro",
+            "betrag_einheit": "einmaleinlage",
+            "unterliegt_limitierungsregeln": True,
+            "einsatzmodus": "nur_bedarf_finanzieren",
+            "anwendungsphase": "nach_regeln",
+            "filter_spalten": "tarifart|alter",
+            "filter_operatoren": "==|>=",
+            "filter_werte": "voll|65",
+            "fallback_erlaubt": True,
+        },
+        {
+            "quelle_id": "rfb_frei",
+            "name": "Freie RfB",
+            "aktiv": True,
+            "prioritaet": 3,
+            "typ": "global",
+            "betrag_euro": 100_000_000,
+            "betrag_spalte": "",
+            "betrag_einheit": "einmaleinlage",
+            "unterliegt_limitierungsregeln": True,
+            "einsatzmodus": "nur_bedarf_finanzieren",
+            "anwendungsphase": "nach_regeln",
+            "filter_spalten": "",
+            "filter_operatoren": "",
+            "filter_werte": "",
+            "fallback_erlaubt": True,
+        },
+    ])
 
 
 # =============================================================================
@@ -647,6 +742,14 @@ def zeige_statistiken(df, df_t, df_ao):
         if anz > 0:
             print(f"  >= {schwelle:>3} €: {anz:>10,}  ({anz / len(df):.2%})")
 
+    print(f"\n  --- Mittelquellen (Einmaleinlagenbasis) ---")
+    if "ueberzins_mittel_euro" in df.columns:
+        print(f"  Ueberzins gesamt:   {df['ueberzins_mittel_euro'].sum():>14,.0f} €")
+    if "zu10_mittel_euro" in df.columns:
+        zu10_berechtigt = (df["tarifart"] == "voll") & (df["alter"] >= 65)
+        print(f"  ZU10 gesamt:        {df['zu10_mittel_euro'].sum():>14,.0f} €")
+        print(f"  ZU10-berechtigt:    {zu10_berechtigt.sum():>12,} Zeilen")
+
     print(f"\n  Tarife: {len(df_t)} | Ausscheideordnung: {len(df_ao):,} Zeilen")
 
 
@@ -663,8 +766,8 @@ def main():
     3. Erzeuge alle vier Ausgabedateien:
        a) tarife.csv - Tarifstammdaten
        b) ausscheideordnung.csv - Sterblichkeit + Stornoquoten
-       c) sterbetafel.csv - (aus PKV-Sterbetafel.csv geladen)
-       d) bestand.csv - 1 Mio. Versicherte mit allen Merkmalen
+       c) bestand.csv - 1 Mio. Versicherte mit allen Merkmalen
+       d) mittelquellen_config.csv - Beispiel-Konfiguration fuer Mittelquellen
     4. Berechne und zeige aggregierte Statistik
     5. Messe und reporte Ausführungszeit und Dateigröße
     
@@ -729,10 +832,14 @@ def main():
     df_b = erzeuge_bestand(df_t, args.mittlere_anpassung, rng)
     df_b.to_csv(os.path.join(ausgabe, "bestand.csv"), index=False, sep=";")
 
+    print("      Mittelquellen-Konfiguration ...")
+    df_mittel = erzeuge_mittelquellen_config()
+    df_mittel.to_csv(os.path.join(ausgabe, "mittelquellen_config.csv"), index=False, sep=";")
+
     zeige_statistiken(df_b, df_t, df_ao)
 
     print(f"\n  Dauer: {time.time() - t0:.1f}s")
-    for name in ["tarife.csv", "ausscheideordnung.csv", "bestand.csv"]:
+    for name in ["tarife.csv", "ausscheideordnung.csv", "bestand.csv", "mittelquellen_config.csv"]:
         p = os.path.join(ausgabe, name)
         print(f"  {name:.<35} {os.path.getsize(p) / (1024 * 1024):>6.1f} MB")
     print(f"\nFertig! → {os.path.abspath(ausgabe)}")

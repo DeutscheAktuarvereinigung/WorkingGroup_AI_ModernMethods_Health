@@ -3,7 +3,8 @@
 PKV-Limitierungstool — Streamlit App
 =====================================
 Tab 1: Bestandsanalyse
-Tab 2: Limitierungsrechnung
+Tab 2: Mittelkonfiguration
+Tab 3: Limitierungsrechnung
 
 Nutzung:
   streamlit run app.py
@@ -66,7 +67,7 @@ from services.optimierung import (
 )
 
 # ── Seiten-Module (UI-Rendering) ─────────────────────────────────────────────
-from app.pages import bestandsanalyse, limitierung
+from app.pages import bestandsanalyse, limitierung, mittelkonfiguration
 
 
 
@@ -163,14 +164,20 @@ with st.sidebar:
                 df_b, w_b = lade_csv(f"{pfad}/bestand.csv", "bestand")
                 df_t, w_t = lade_csv(f"{pfad}/tarife.csv", "tarife")
                 df_a, w_a = lade_csv(f"{pfad}/ausscheideordnung.csv", "ao")
+                try:
+                    df_m, w_m = lade_csv(f"{pfad}/mittelquellen_config.csv", "mittelquellen")
+                except FileNotFoundError:
+                    df_m, w_m = None, []
                 # DataFrames im Session-State speichern (app-weite Datenhaltung)
                 st.session_state["df_bestand"] = df_b
                 st.session_state["df_tarife"] = df_t
                 st.session_state["df_ao"] = df_a
+                st.session_state["df_mittelquellen_config_geladen"] = df_m
                 # Gefilterten Bestand zurücksetzen, damit kein veralteter Filter verbleibt
                 st.session_state.pop("df_gefiltert", None)
+                st.session_state.pop("mittelquellen_config", None)
                 st.success(f"✓ {len(df_b):,} Versicherte geladen")
-                alle_warnungen = w_b + w_t + w_a
+                alle_warnungen = w_b + w_t + w_a + w_m
                 for w in alle_warnungen:
                     st.warning(f"⚠️ {w}")
                 logger.info("Daten geladen: %d Versicherte, %d Warnungen", len(df_b), len(alle_warnungen))
@@ -183,16 +190,30 @@ with st.sidebar:
         f_b = st.file_uploader("bestand.csv", type="csv", key="up_b")
         f_t = st.file_uploader("tarife.csv", type="csv", key="up_t")
         f_a = st.file_uploader("ausscheideordnung.csv", type="csv", key="up_a")
+        f_m = st.file_uploader("mittelquellen_config.csv (optional)", type="csv", key="up_m")
         if f_b and f_t and f_a:  # Erst laden wenn alle drei Dateien vorhanden sind
+            upload_signature = tuple(
+                (getattr(f, "name", None), getattr(f, "size", None))
+                for f in [f_b, f_t, f_a, f_m]
+            )
+            daten_geaendert = st.session_state.get("_upload_data_signature") != upload_signature
             df_b, w_b = lade_csv(f_b, "bestand")
             df_t, w_t = lade_csv(f_t, "tarife")
             df_a, w_a = lade_csv(f_a, "ao")
+            if f_m:
+                df_m, w_m = lade_csv(f_m, "mittelquellen")
+            else:
+                df_m, w_m = None, []
             st.session_state["df_bestand"] = df_b
             st.session_state["df_tarife"] = df_t
             st.session_state["df_ao"] = df_a
-            st.session_state.pop("df_gefiltert", None)
+            st.session_state["df_mittelquellen_config_geladen"] = df_m
+            if daten_geaendert:
+                st.session_state.pop("df_gefiltert", None)
+                st.session_state.pop("mittelquellen_config", None)
+                st.session_state["_upload_data_signature"] = upload_signature
             st.success(f"✓ {len(df_b):,} Versicherte geladen")
-            alle_warnungen = w_b + w_t + w_a
+            alle_warnungen = w_b + w_t + w_a + w_m
             for w in alle_warnungen:
                 st.warning(f"⚠️ {w}")
             logger.info("Daten geladen (Upload): %d Versicherte, %d Warnungen", len(df_b), len(alle_warnungen))
@@ -298,8 +319,12 @@ if df_gefiltert is None or df_bestand is None:
     st.info("Bitte laden Sie die Daten über die Sidebar (links).")
     st.stop()
 
-# Zwei Haupt-Tabs: Bestandsübersicht und Limitierungsrechnung
-tab_bestand, tab_limitierung = st.tabs(["📊 Bestandsanalyse", "⚖️ Limitierungsrechnung"])
+# Drei Haupt-Tabs: Bestandsübersicht, Mittelkonfiguration und Limitierungsrechnung
+tab_bestand, tab_mittel, tab_limitierung = st.tabs([
+    "📊 Bestandsanalyse",
+    "💶 Mittelkonfiguration",
+    "⚖️ Limitierungsrechnung",
+])
 
 
 # =============================================================================
@@ -320,7 +345,18 @@ with tab_bestand:
 
 
 # =============================================================================
-# TAB 2: LIMITIERUNGSRECHNUNG
+# TAB 2: MITTELKONFIGURATION
+# =============================================================================
+
+with tab_mittel:
+    mittelkonfiguration.render_mittelkonfiguration(
+        df_bestand,
+        st.session_state.get("df_mittelquellen_config_geladen"),
+    )
+
+
+# =============================================================================
+# TAB 3: LIMITIERUNGSRECHNUNG
 # =============================================================================
 
 @st.cache_data(show_spinner="Berechne Leibrentenbarwerte …")

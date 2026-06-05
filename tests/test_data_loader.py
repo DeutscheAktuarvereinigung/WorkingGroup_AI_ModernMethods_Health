@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from services.data_loader import erzeuge_altersgruppen, lade_csv, _validiere_bestand
+from services.data_loader import erzeuge_altersgruppen, lade_csv, _validiere_bestand, validiere_mittelquellen_config
 
 
 # ── erzeuge_altersgruppen ────────────────────────────────────────────────────
@@ -113,6 +113,16 @@ class TestLadeCsv:
         df, _ = lade_csv(csv, "bestand")
         assert df.iloc[0]["altersgruppe"] == "40-49"
 
+    def test_bestand_mit_mittelspalten_erfolgreich(self):
+        csv = self._make_csv(self._bestand_daten(
+            ueberzins_mittel_euro=[120.0, 80.0],
+            zu10_mittel_euro=[0.0, 250.0],
+        ))
+        df, warnungen = lade_csv(csv, "bestand")
+        assert "ueberzins_mittel_euro" in df.columns
+        assert "zu10_mittel_euro" in df.columns
+        assert isinstance(warnungen, list)
+
 
 # ── Datenvalidierung ────────────────────────────────────────────────────────
 
@@ -196,6 +206,16 @@ class TestValidierung:
         warnungen = _validiere_bestand(df)
         assert any("erhoehung_absolut" in w for w in warnungen)
 
+    def test_mittelspalte_nicht_numerisch_fehler(self):
+        df = self._bestand_df(ueberzins_mittel_euro=["viel", "wenig"])
+        with pytest.raises(ValueError, match="ueberzins_mittel_euro.*numerisch"):
+            _validiere_bestand(df)
+
+    def test_mittelspalte_negativ_fehler(self):
+        df = self._bestand_df(zu10_mittel_euro=[0.0, -1.0])
+        with pytest.raises(ValueError, match="zu10_mittel_euro.*negative"):
+            _validiere_bestand(df)
+
     def test_tarife_fehlende_spalte(self):
         csv_buf = io.StringIO()
         pd.DataFrame({"nur_eine_spalte": [1]}).to_csv(csv_buf, sep=";", index=False)
@@ -209,6 +229,75 @@ class TestValidierung:
         csv_buf.seek(0)
         with pytest.raises(ValueError, match="Ausscheideordnung.*Fehlende Spalten"):
             lade_csv(csv_buf, "ao")
+
+
+# ── Mittelquellen-Konfiguration ──────────────────────────────────────────────
+
+
+class TestMittelquellenConfig:
+
+    def _bestand_df(self):
+        return pd.DataFrame({
+            "versicherten_id": ["V1", "V2"],
+            "alter": [66, 62],
+            "geschlecht": ["M", "W"],
+            "tarifwerk": ["Classic", "Komfort"],
+            "tarif_id": ["CL-VOLL", "KO-AMB"],
+            "tarifart": ["voll", "ambulant"],
+            "praemie_alt_monatlich": [500.0, 200.0],
+            "praemie_neu_monatlich": [600.0, 230.0],
+            "erhoehung_absolut": [100.0, 30.0],
+            "erhoehung_prozent": [20.0, 15.0],
+            "alterungsrueckstellung": [30000.0, 10000.0],
+            "versicherungsdauer_jahre": [20, 8],
+            "ueberzins_mittel_euro": [900.0, 200.0],
+            "zu10_mittel_euro": [1500.0, 0.0],
+        })
+
+    def _config_df(self, **overrides):
+        daten = {
+            "quelle_id": ["ueberzins", "zu10", "rfb_frei"],
+            "name": ["Ueberzins", "ZU10", "Freie RfB"],
+            "aktiv": [True, True, True],
+            "prioritaet": [1, 2, 3],
+            "typ": ["zeilenindividuell", "zeilenindividuell", "global"],
+            "betrag_euro": [np.nan, np.nan, 1_000_000.0],
+            "betrag_spalte": ["ueberzins_mittel_euro", "zu10_mittel_euro", ""],
+            "betrag_einheit": ["einmaleinlage", "einmaleinlage", "einmaleinlage"],
+            "unterliegt_limitierungsregeln": [False, True, True],
+            "einsatzmodus": ["pflicht_vollstaendig", "nur_bedarf_finanzieren", "nur_bedarf_finanzieren"],
+            "anwendungsphase": ["vor_regeln", "nach_regeln", "nach_regeln"],
+            "filter_spalten": ["", "tarifart|alter", ""],
+            "filter_operatoren": ["", "==|>=", ""],
+            "filter_werte": ["", "voll|65", ""],
+            "fallback_erlaubt": [True, True, True],
+        }
+        daten.update(overrides)
+        return pd.DataFrame(daten)
+
+    def test_mittelquellen_config_erfolgreich(self):
+        warnungen = validiere_mittelquellen_config(self._config_df(), self._bestand_df())
+        assert warnungen == []
+
+    def test_fehlende_betragsspalte_fehler(self):
+        cfg = self._config_df(betrag_spalte=["fehlt", "zu10_mittel_euro", ""])
+        with pytest.raises(ValueError, match="fehlende Betragsspalte"):
+            validiere_mittelquellen_config(cfg, self._bestand_df())
+
+    def test_fehlende_filterspalte_fehler(self):
+        cfg = self._config_df(filter_spalten=["", "tarifart|nicht_da", ""])
+        with pytest.raises(ValueError, match="fehlende Filterspalte"):
+            validiere_mittelquellen_config(cfg, self._bestand_df())
+
+    def test_aktive_prioritaeten_muessen_eindeutig_sein(self):
+        cfg = self._config_df(prioritaet=[1, 1, 3])
+        with pytest.raises(ValueError, match="eindeutige prioritaet"):
+            validiere_mittelquellen_config(cfg, self._bestand_df())
+
+    def test_regelunabhaengige_quelle_muss_vor_regeln_liegen(self):
+        cfg = self._config_df(anwendungsphase=["nach_regeln", "nach_regeln", "nach_regeln"])
+        with pytest.raises(ValueError, match="regelunabhaengig"):
+            validiere_mittelquellen_config(cfg, self._bestand_df())
 
 
 # ── person_id Validierung ────────────────────────────────────────────────────

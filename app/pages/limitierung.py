@@ -6,6 +6,10 @@ import plotly.graph_objects as go
 from scipy.ndimage import uniform_filter1d
 
 from services.bestandsanalyse import df_hash, formatiere_euro
+from services.limitierungs_pipeline import (
+    berechne_limitierung_mit_mittelquellen,
+    finanziere_limitierungsergebnis,
+)
 from ui.theme import (
     DAV_BLAU_AKZENT,
     DAV_BLAU_DUNKEL,
@@ -19,6 +23,66 @@ def _geschlecht_label(code):
     """M/W/D → deutscher Label"""
     mapping = {"M": "Männlich", "W": "Weiblich", "D": "Divers"}
     return mapping.get(str(code), str(code))
+
+
+def _als_bool(wert) -> bool:
+    if isinstance(wert, (bool, np.bool_)):
+        return bool(wert)
+    return str(wert).strip().lower() in {"true", "1", "ja", "yes", "wahr"}
+
+
+def _hat_aktive_mittelquellen(df_config: pd.DataFrame | None) -> bool:
+    return df_config is not None and "aktiv" in df_config.columns and df_config["aktiv"].map(_als_bool).any()
+
+
+def _synchronisiere_rfb_budget(df_config: pd.DataFrame | None, budget: float) -> pd.DataFrame | None:
+    """Spiegelt das bestehende UI-Budget in die freie RfB-Quelle fuer die Rechnung."""
+    if df_config is None:
+        return None
+    config = df_config.copy()
+    if "quelle_id" not in config.columns or "betrag_euro" not in config.columns:
+        return config
+    rfb_maske = config["quelle_id"].astype(str).eq("rfb_frei")
+    if rfb_maske.any():
+        config.loc[rfb_maske, "betrag_euro"] = float(budget)
+    return config
+
+
+def _aktive_quellen_summary(df_config: pd.DataFrame | None) -> str:
+    if not _hat_aktive_mittelquellen(df_config):
+        return "Keine aktive Mittelquelle."
+    aktive = df_config[df_config["aktiv"].map(_als_bool)].sort_values("prioritaet")
+    teile = []
+    for _, quelle in aktive.iterrows():
+        regelbindung = "regelgebunden" if _als_bool(quelle["unterliegt_limitierungsregeln"]) else "regelunabhängig"
+        teile.append(f"{quelle['prioritaet']}: {quelle['name']} ({regelbindung})")
+    return " · ".join(teile)
+
+
+def _mittelquellen_nachweis(res: pd.DataFrame, df_config: pd.DataFrame | None) -> pd.DataFrame:
+    """Aggregiert verwendete Mittel je Quelle fuer Anzeige und Exportkontrolle."""
+    source_cols = [c for c in res.columns if c.startswith("mittel_verwendet_")]
+    if not source_cols:
+        return pd.DataFrame()
+
+    name_map = {}
+    regel_map = {}
+    if df_config is not None and "quelle_id" in df_config.columns:
+        for _, quelle in df_config.iterrows():
+            suffix = str(quelle["quelle_id"]).strip().lower()
+            name_map[f"mittel_verwendet_{suffix}"] = quelle.get("name", suffix)
+            regel_map[f"mittel_verwendet_{suffix}"] = (
+                "regelgebunden" if _als_bool(quelle.get("unterliegt_limitierungsregeln")) else "regelunabhängig"
+            )
+
+    rows = []
+    for col in source_cols:
+        rows.append({
+            "Quelle": name_map.get(col, col.replace("mittel_verwendet_", "")),
+            "Regelbindung": regel_map.get(col, "-"),
+            "Verwendet": float(res[col].sum()),
+        })
+    return pd.DataFrame(rows).sort_values("Verwendet", ascending=False)
 
 
 def render_limitierung(
@@ -146,6 +210,16 @@ def render_limitierung(
                 step=1_000_000, format="%d",
                 help="Gesamtbetrag in Euro, der für Limitierung zur Verfügung steht.",
             )
+            mittelquellen_config_roh = st.session_state.get(
+                "mittelquellen_config",
+                st.session_state.get("df_mittelquellen_config_geladen"),
+            )
+            mittelquellen_config_rechnung = _synchronisiere_rfb_budget(mittelquellen_config_roh, budget)
+            st.session_state["mittelquellen_config_rechnung"] = mittelquellen_config_rechnung
+            if mittelquellen_config_rechnung is not None:
+                st.caption("**Mittelquellen:** " + _aktive_quellen_summary(mittelquellen_config_rechnung))
+            else:
+                st.caption("**Mittelquellen:** Keine Konfiguration aktiv. Die klassische RfB-Budget-Sicht bleibt verfügbar.")
             modus_key = "dauerhaft"
             laufzeit = 1
 
@@ -347,35 +421,73 @@ def render_limitierung(
         # === BERECHNUNG ===
         if st.button("🔄 Limitierung berechnen", type="primary", use_container_width=True):
             aktive_regeln = [r for r in regeln if r.get("ziel_pct") or r.get("ziel_abs")]
+            mittelquellen_config_rechnung = st.session_state.get("mittelquellen_config_rechnung")
+            hat_aktive_mittelquellen = _hat_aktive_mittelquellen(mittelquellen_config_rechnung)
 
-            if not aktive_regeln and not (hat_person_id and personen_aktiv):
-                st.warning("Bitte definieren Sie mindestens eine Regel.")
+            if not aktive_regeln and not (hat_person_id and personen_aktiv) and not hat_aktive_mittelquellen:
+                st.warning("Bitte definieren Sie mindestens eine Regel oder aktivieren Sie eine Mittelquelle.")
             else:
                 lim_hash = df_hash(df_lim)
+                personen_regel = st.session_state.get("personen_regel", {})
+                v_modus = st.session_state.get("verteilungsmodus", "proportional")
+                rf = st.session_state.get("reihenfolge", "tarif_zuerst")
 
-                # Personen-Limitierung, wenn aktiviert und person_id vorhanden
-                if hat_person_id and personen_aktiv:
-                    personen_regel = st.session_state.get("personen_regel", {})
-                    v_modus = st.session_state.get("verteilungsmodus", "proportional")
-                    rf = st.session_state.get("reihenfolge", "tarif_zuerst")
-                    res = berechne_limitierung_person(
-                        lim_hash, df_lim, df_bwf, aktive_regeln, personen_regel,
-                        modus_key, laufzeit, rf, v_modus,
-                    )
-                else:
-                    res = berechne_limitierung(lim_hash, df_lim, df_bwf, aktive_regeln, modus_key, laufzeit)
+                try:
+                    if hat_aktive_mittelquellen:
+                        pipeline = berechne_limitierung_mit_mittelquellen(
+                            df_lim,
+                            df_bwf,
+                            mittelquellen_config_rechnung,
+                            aktive_regeln,
+                            modus_key,
+                            laufzeit,
+                            personen_aktiv=bool(hat_person_id and personen_aktiv),
+                            personen_regel=personen_regel,
+                            reihenfolge=rf,
+                            verteilungsmodus=v_modus,
+                        )
+                        res = pipeline["res_mittelverwendung"]
+                        st.session_state["lim_result_basis"] = pipeline["res_limitierung_basis"]
+                        st.session_state["lim_rechenbestand"] = pipeline["df_rechenbestand"]
+                        st.session_state["lim_mittel_pipeline_meta"] = {
+                            k: v for k, v in pipeline.items()
+                            if not isinstance(v, pd.DataFrame)
+                        }
+                        st.session_state["lim_mittelquellen_config"] = mittelquellen_config_rechnung
+                    else:
+                        # Personen-Limitierung, wenn aktiviert und person_id vorhanden
+                        if hat_person_id and personen_aktiv:
+                            res = berechne_limitierung_person(
+                                lim_hash, df_lim, df_bwf, aktive_regeln, personen_regel,
+                                modus_key, laufzeit, rf, v_modus,
+                            )
+                        else:
+                            res = berechne_limitierung(lim_hash, df_lim, df_bwf, aktive_regeln, modus_key, laufzeit)
+                        st.session_state["lim_result_basis"] = res.copy()
+                        st.session_state["lim_rechenbestand"] = df_lim.copy()
+                        st.session_state["lim_mittel_pipeline_meta"] = {}
+                        st.session_state["lim_mittelquellen_config"] = None
 
-                st.session_state["lim_result"] = res
-                st.session_state["lim_regeln_snapshot"] = aktive_regeln
-                st.session_state["lim_budget"] = budget
-                st.session_state["lim_modus"] = modus_key
-                st.session_state["lim_laufzeit"] = laufzeit
+                    st.session_state["lim_result"] = res
+                    st.session_state["lim_bestand_original"] = df_lim.copy()
+                    st.session_state["lim_regeln_snapshot"] = aktive_regeln
+                    st.session_state["lim_budget"] = budget
+                    st.session_state["lim_modus"] = modus_key
+                    st.session_state["lim_laufzeit"] = laufzeit
+                except ValueError as exc:
+                    st.error(f"Limitierungsrechnung konnte nicht ausgeführt werden: {exc}")
 
         # === ERGEBNISSE ===
         res = st.session_state.get("lim_result")
 
         if res is not None:
-            df_lim_aktuell = df_lim
+            df_lim_aktuell = st.session_state.get("lim_bestand_original", df_lim)
+            if len(df_lim_aktuell) != len(res):
+                df_lim_aktuell = df_lim
+            df_lim_rechenbestand = st.session_state.get("lim_rechenbestand", df_lim_aktuell)
+            res_limitierung_basis = st.session_state.get("lim_result_basis", res)
+            mittelquellen_config_rechnung = st.session_state.get("lim_mittelquellen_config")
+            mittel_meta = st.session_state.get("lim_mittel_pipeline_meta", {})
             bedarf = res["einmaleinlage"].sum()
             n_limitiert = res["limitiert"].sum()
             n_gesamt = len(res)
@@ -481,19 +593,38 @@ def render_limitierung(
                     (1 - p) * res["einmaleinlage"].values + p * einmaleinlage_befristet, 2
                 )
 
+                bedarf_dauerhaft = float(bedarf)
                 bedarf_gemischt = einmaleinlage_gemischt.sum()
                 bedarf_befristet_voll = einmaleinlage_befristet.sum()
-                einsparung = bedarf - bedarf_gemischt
+                einsparung = bedarf_dauerhaft - bedarf_gemischt
+
+                if _hat_aktive_mittelquellen(mittelquellen_config_rechnung):
+                    res_basis_gemischt = res_limitierung_basis.copy()
+                    res_basis_gemischt["einmaleinlage"] = einmaleinlage_gemischt
+                    try:
+                        res = finanziere_limitierungsergebnis(
+                            df_lim_rechenbestand,
+                            res_basis_gemischt,
+                            mittelquellen_config_rechnung,
+                        )
+                    except ValueError as exc:
+                        st.error(f"Mittelverwendung für Befristungsmischung konnte nicht berechnet werden: {exc}")
+                    else:
+                        bedarf = bedarf_gemischt
+                else:
+                    res = res.copy()
+                    res["einmaleinlage"] = einmaleinlage_gemischt
+                    bedarf = bedarf_gemischt
 
                 bf_m1, bf_m2, bf_m3, bf_m4 = st.columns(4)
                 with bf_m1:
-                    st.metric("RfB-Bedarf (dauerhaft)", formatiere_euro(bedarf))
+                    st.metric("RfB-Bedarf (dauerhaft)", formatiere_euro(bedarf_dauerhaft))
                 with bf_m2:
                     st.metric("RfB-Bedarf (gemischt)", formatiere_euro(bedarf_gemischt))
                 with bf_m3:
                     st.metric(
                         "Einsparung", formatiere_euro(einsparung),
-                        delta=f"{einsparung / bedarf * 100:.1f} %" if bedarf > 0 else "–",
+                        delta=f"{einsparung / bedarf_dauerhaft * 100:.1f} %" if bedarf_dauerhaft > 0 else "–",
                     )
                 with bf_m4:
                     diff_budget_gem = budget_val - bedarf_gemischt
@@ -505,11 +636,70 @@ def render_limitierung(
                 st.info(
                     f"**Mischung:** {100 - anteil_befristet} % dauerhaft + "
                     f"{anteil_befristet} % befristet ({befristung_jahre} Jahre)\n\n"
-                    f"- RfB-Bedarf bei 100 % dauerhaft: {formatiere_euro(bedarf)}\n"
+                    f"- RfB-Bedarf bei 100 % dauerhaft: {formatiere_euro(bedarf_dauerhaft)}\n"
                     f"- RfB-Bedarf bei 100 % befristet ({befristung_jahre} J.): "
                     f"{formatiere_euro(bedarf_befristet_voll)}\n"
                     f"- RfB-Bedarf bei aktueller Mischung: {formatiere_euro(bedarf_gemischt)}"
                 )
+
+            if "finanziert_gesamt" in res.columns:
+                st.markdown("### 💶 Mittelquellen-Finanzierung")
+                bedarf_regelgebunden = float(res["einmaleinlage"].sum())
+                finanziert_gesamt = float(res["finanziert_gesamt"].sum())
+                unterdeckung_gesamt = float(res["unterdeckung"].sum())
+                finanzierungsquote = finanziert_gesamt / bedarf_regelgebunden if bedarf_regelgebunden > 0 else 1.0
+                regelunabhaengig = float(res.get(
+                    "mittel_regelunabhaengig_einmaleinlage",
+                    pd.Series(np.zeros(len(res))),
+                ).sum())
+                bedarf_vor_vorab = mittel_meta.get("bedarf_vor_regelunabhaengigen_mitteln")
+
+                mf1, mf2, mf3, mf4 = st.columns(4)
+                with mf1:
+                    st.metric(
+                        "Bedarf vor Vorab-Mitteln",
+                        formatiere_euro(bedarf_vor_vorab) if bedarf_vor_vorab is not None else "–",
+                    )
+                with mf2:
+                    st.metric("Regelunabhängige Mittel", formatiere_euro(regelunabhaengig))
+                with mf3:
+                    st.metric("Regelgebundener Bedarf", formatiere_euro(bedarf_regelgebunden))
+                with mf4:
+                    st.metric("Regelgebunden finanziert", formatiere_euro(finanziert_gesamt),
+                              delta=f"Quote {finanzierungsquote:.1%}")
+
+                mf5, mf6 = st.columns(2)
+                with mf5:
+                    st.metric("Unterdeckung", formatiere_euro(unterdeckung_gesamt))
+                with mf6:
+                    st.caption("Die freie RfB-Quelle wird für die Rechnung mit dem UI-Budget synchronisiert.")
+
+                nachweis = _mittelquellen_nachweis(res, mittelquellen_config_rechnung)
+                if len(nachweis) > 0:
+                    fig_mittel = go.Figure(go.Bar(
+                        x=nachweis["Quelle"],
+                        y=nachweis["Verwendet"] / 1e6,
+                        marker_color=DAV_BLAU_AKZENT,
+                        customdata=np.column_stack([nachweis["Regelbindung"], nachweis["Verwendet"]]),
+                        hovertemplate=(
+                            "<b>%{x}</b><br>Regelbindung: %{customdata[0]}<br>"
+                            "Verwendet: %{customdata[1]:,.0f} €<extra></extra>"
+                        ),
+                    ))
+                    fig_mittel.update_layout(
+                        **PLOTLY_LAYOUT,
+                        title="Verwendete Mittel je Quelle",
+                        xaxis_title="Mittelquelle",
+                        yaxis_title="Verwendete Mittel (Mio. €)",
+                        height=360,
+                        showlegend=False,
+                    )
+                    fig_mittel.update_yaxes(gridcolor="#eee", rangemode="tozero")
+                    st.plotly_chart(fig_mittel, use_container_width=True)
+
+                    nachweis_anzeige = nachweis.copy()
+                    nachweis_anzeige["Verwendet"] = nachweis_anzeige["Verwendet"].map(formatiere_euro)
+                    st.dataframe(nachweis_anzeige, hide_index=True, use_container_width=True)
 
             st.markdown("---")
 
@@ -1216,13 +1406,8 @@ def render_limitierung(
             # --- Export ---
             with st.expander("📥 Export"):
                 df_export = df_lim_aktuell.copy()
-                df_export["erhoehung_limitiert_pct"] = res["erhoehung_limitiert_pct"].values
-                df_export["erhoehung_limitiert_abs"] = res["erhoehung_limitiert_abs"].values
-                df_export["praemie_limitiert"] = res["praemie_limitiert"].values
-                df_export["einmaleinlage"] = res["einmaleinlage"].values
-                df_export["limitiert"] = res["limitiert"].values
-                df_export["regel_index"] = res["regel_index"].values
-                df_export["regel_beschreibung"] = res["regel_beschreibung"].values
+                for spalte in res.columns:
+                    df_export[spalte] = res[spalte].values
 
                 st.info(f"{len(df_export):,} Zeilen mit Limitierungsergebnis.")
                 if st.button("CSV erzeugen", key="lim_csv"):
