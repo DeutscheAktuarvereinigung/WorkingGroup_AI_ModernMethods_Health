@@ -85,6 +85,17 @@ def _mittelquellen_nachweis(res: pd.DataFrame, df_config: pd.DataFrame | None) -
     return pd.DataFrame(rows).sort_values("Verwendet", ascending=False)
 
 
+def erstelle_export_dataframe(df_lim_aktuell: pd.DataFrame, res: pd.DataFrame) -> pd.DataFrame:
+    """Erstellt den reproduzierbaren CSV-Export mit allen Ergebnis- und Nachweisspalten."""
+    if len(df_lim_aktuell) != len(res):
+        raise ValueError("Export: Bestand und Limitierungsergebnis muessen gleich viele Zeilen haben.")
+
+    df_export = df_lim_aktuell.copy()
+    for spalte in res.columns:
+        df_export[spalte] = res[spalte].to_numpy()
+    return df_export
+
+
 def render_limitierung(
     df_bestand,
     df_gefiltert,
@@ -1405,10 +1416,7 @@ def render_limitierung(
 
             # --- Export ---
             with st.expander("📥 Export"):
-                df_export = df_lim_aktuell.copy()
-                for spalte in res.columns:
-                    df_export[spalte] = res[spalte].values
-
+                df_export = erstelle_export_dataframe(df_lim_aktuell, res)
                 st.info(f"{len(df_export):,} Zeilen mit Limitierungsergebnis.")
                 if st.button("CSV erzeugen", key="lim_csv"):
                     csv_bytes = df_export.to_csv(index=False, sep=";").encode("utf-8")

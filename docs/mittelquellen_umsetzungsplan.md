@@ -4,16 +4,17 @@ Dieses Markdown-Dokument ist die Grundlage fuer die naechsten Implementierungen.
 
 ## 1. Aktueller Status
 
-- Stand: 2026-06-05.
+- Stand: 2026-06-08.
 - Phase A wurde dokumentarisch umgesetzt: Fachsemantik, Konfigurationsschema, Default-Konfiguration und offene Folgephasen sind festgehalten.
 - Phase B wurde umgesetzt: Mock-Bestand enthaelt Mittelspalten, Beispiel-Konfiguration wird erzeugt, und Datenvalidierung fuer Mittelspalten/Konfiguration ist vorhanden.
 - Phase C wurde umgesetzt: Die Service-Schicht fuer regelunabhaengige Vorab-Entlastung und regelgebundene Mittelverwendung ist vorhanden.
 - Phase D wurde umgesetzt: Die App enthaelt einen Tab „Mittelkonfiguration“ mit editierbarer, validierter Quellenkonfiguration im Session-State.
 - Phase E wurde umgesetzt: Die Limitierungsrechnung orchestriert regelunabhaengige Mittel, UI-Regeln, Personen-Limitierung, Befristungsmischung und regelgebundene Finanzierung.
+- Phase F wurde umgesetzt: Die fachlichen Regressionen fuer Ueberzins, ZU10, freie RfB, Fallback, Validierung, Rueckwaertskompatibilitaet und Exportspalten sind automatisiert abgesichert.
 - Die aktuelle Kernrechnung erzeugt in `berechne_limitierung()` weiterhin einen Gesamtbedarf je Zeile ueber `einmaleinlage`; die Mittelquellen-Orchestrierung liegt additiv in `services/limitierungs_pipeline.py`.
 - Das einzelne RfB-Budget wird fuer die Rechnung in die Quelle `rfb_frei` gespiegelt.
 - Die Bestandssimulation erzeugt `ueberzins_mittel_euro`, `zu10_mittel_euro` und `mittelquellen_config.csv`.
-- Automatisierte Tests fuer Phase B/C/D/E wurden ausgefuehrt; Details stehen im Testprotokoll.
+- Automatisierte Tests fuer Phase B/C/D/E/F wurden ausgefuehrt; Details stehen im Testprotokoll.
 
 ## 2. Getroffene fachliche Entscheidungen
 
@@ -180,17 +181,17 @@ Validierungsentscheidungen fuer Phase B/C:
 
 ### Phase F — Tests und Regression
 
-- [ ] Test: Ueberzins wird auch ohne UI-Regel vollstaendig bis zur vorhandenen Beitragsanpassung angewendet.
-- [ ] Test: Ueberzins wird vor UI-Regeln angewendet und reduziert den nachfolgenden regelbedingten Bedarf.
-- [ ] Test: ZU10 wird nur fuer Alter >= 65 und Tarifart voll angewendet.
-- [ ] Test: ZU10 wird fuer Alter < 65 nicht angewendet, selbst wenn eine Betragsspalte vorhanden ist.
-- [ ] Test: freie RfB finanziert nur regelgebundenen Bedarf.
-- [ ] Test: Fallback-Reihenfolge bei erschoepftem Topf.
-- [ ] Test: globale Quelle wird bei Unterdeckung proportional verteilt oder gemaess dokumentierter Fachentscheidung zugeordnet.
-- [ ] Test: fehlende Betragsspalte erzeugt `ValueError`.
-- [ ] Test: negative Mittelwerte erzeugen `ValueError`.
-- [ ] Test: bestehende Limitierungsfunktion bleibt rueckwaertskompatibel fuer bestehende Tests.
-- [ ] Test: Export enthaelt erwartete Schluessel- und Mittelquellen-Spalten.
+- [x] Test: Ueberzins wird auch ohne UI-Regel vollstaendig bis zur vorhandenen Beitragsanpassung angewendet.
+- [x] Test: Ueberzins wird vor UI-Regeln angewendet und reduziert den nachfolgenden regelbedingten Bedarf.
+- [x] Test: ZU10 wird nur fuer Alter >= 65 und Tarifart voll angewendet.
+- [x] Test: ZU10 wird fuer Alter < 65 nicht angewendet, selbst wenn eine Betragsspalte vorhanden ist.
+- [x] Test: freie RfB finanziert nur regelgebundenen Bedarf.
+- [x] Test: Fallback-Reihenfolge bei erschoepftem Topf.
+- [x] Test: globale Quelle wird bei Unterdeckung proportional verteilt oder gemaess dokumentierter Fachentscheidung zugeordnet.
+- [x] Test: fehlende Betragsspalte erzeugt `ValueError`.
+- [x] Test: negative Mittelwerte erzeugen `ValueError`.
+- [x] Test: bestehende Limitierungsfunktion bleibt rueckwaertskompatibel fuer bestehende Tests.
+- [x] Test: Export enthaelt erwartete Schluessel- und Mittelquellen-Spalten.
 
 ## 6. Relevante bestehende Dateien
 
@@ -275,7 +276,21 @@ Validierungsentscheidungen fuer Phase B/C:
   - `python -m py_compile services/limitierungs_pipeline.py app/pages/limitierung.py app.py` -> Exit-Code 0.
   - `python -m pytest -q` -> 160 passed in 6.23s.
 
-### Noch nicht ausgefuehrt
+### 2026-06-08 — Phase F Tests und Regression
+
+- Geaenderte Dateien: `app/pages/limitierung.py`, `tests/test_mittelverwendung.py`, `tests/test_limitierungs_pipeline.py`, `README.md`, `docs/mittelquellen_umsetzungsplan.md`.
+- Implementierung:
+  - Der CSV-Export wurde in `erstelle_export_dataframe(...)` gekapselt, damit erwartete Schluessel- und Mittelquellen-Spalten automatisiert pruefbar sind.
+  - ZU10-Regressionsdeckung wurde explizit um den Fall `alter < 65` trotz vorhandener Betragsspalte erweitert.
+  - Freie RfB wird als regelgebundener Folgetopf gegen Zeilen ohne Bedarf abgesichert.
+  - Fallback-Reihenfolge wird mit ZU10 vor freier RfB und anschliessender Restfinanzierung getestet.
+  - Bereits vorhandene Tests decken Ueberzins-Vorabwirkung, proportionale globale Unterdeckung, fehlende Betragsspalten, negative Mittelwerte und Rueckwaertskompatibilitaet der bestehenden Limitierung ab.
+- Tests:
+  - `python -m pytest tests/test_mittelverwendung.py tests/test_limitierungs_pipeline.py tests/test_data_loader.py tests/test_limitierung.py -q` -> 107 passed in 8.33s.
+  - `python -m py_compile app/pages/limitierung.py tests/test_mittelverwendung.py tests/test_limitierungs_pipeline.py` -> Exit-Code 0.
+  - `python -m pytest -q` -> 164 passed in 7.51s.
+
+### Optionaler manueller Nachlauf
 
 - [ ] Manuelle Streamlit-Pruefung mit Mockdaten und Mittelkonfiguration.
 

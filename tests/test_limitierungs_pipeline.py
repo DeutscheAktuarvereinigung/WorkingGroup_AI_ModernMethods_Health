@@ -3,6 +3,7 @@
 import pandas as pd
 import pytest
 
+from app.pages.limitierung import erstelle_export_dataframe
 from services.limitierungs_pipeline import (
     berechne_limitierung_mit_mittelquellen,
     finanziere_limitierungsergebnis,
@@ -142,3 +143,38 @@ def test_berechne_limitierung_mit_mittelquellen_personenlimitierung(
     assert "person_limitiert" in res.columns
     assert res["person_limitiert"].sum() == 2
     assert result["bedarf_nach_regelunabhaengigen_mitteln"] < result["bedarf_vor_regelunabhaengigen_mitteln"]
+
+
+def test_erstelle_export_dataframe_enthaelt_mittelquellen_spalten(
+    bestand_pipeline,
+    bwf_pipeline,
+    mittelquellen_pipeline,
+):
+    regeln = [{"ziel_pct": 10.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
+    pipeline = berechne_limitierung_mit_mittelquellen(
+        bestand_pipeline,
+        bwf_pipeline,
+        mittelquellen_pipeline,
+        regeln,
+        modus="dauerhaft",
+        laufzeit_jahre=1,
+    )
+
+    export = erstelle_export_dataframe(bestand_pipeline, pipeline["res_mittelverwendung"])
+
+    erwartete_spalten = {
+        "versicherten_id",
+        "tarif_id",
+        "einmaleinlage",
+        "einmaleinlage_ohne_regelunabhaengige_mittel",
+        "einmaleinlage_regelgebunden",
+        "mittel_verwendet_ueberzins",
+        "mittel_verwendet_zu10",
+        "mittel_verwendet_rfb_frei",
+        "mittel_regelunabhaengig_einmaleinlage",
+        "finanziert_gesamt",
+        "unterdeckung",
+        "finanzierungsquote",
+    }
+    assert erwartete_spalten.issubset(export.columns)
+    assert export["versicherten_id"].tolist() == bestand_pipeline["versicherten_id"].tolist()

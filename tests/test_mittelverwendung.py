@@ -103,6 +103,52 @@ def test_berechne_mittelverwendung_zu10_nur_voll_ab_65(bestand_mittel, mittelque
     assert result["finanziert_gesamt"].sum() <= res_limitierung["einmaleinlage"].sum()
 
 
+def test_berechne_mittelverwendung_zu10_ignoriert_unter_65_trotz_betrag(
+    bestand_mittel, mittelquellen_config,
+):
+    cfg = mittelquellen_config.copy()
+    cfg.loc[cfg["quelle_id"] == "rfb_frei", "aktiv"] = False
+    res_limitierung = pd.DataFrame({"einmaleinlage": [0.0, 0.0, 0.0, 800.0]})
+
+    result = berechne_mittelverwendung(bestand_mittel, res_limitierung, cfg)
+
+    assert bestand_mittel.loc[3, "alter"] < 65
+    assert bestand_mittel.loc[3, "tarifart"] == "voll"
+    assert bestand_mittel.loc[3, "zu10_mittel_euro"] > 0
+    assert result.loc[3, "mittel_verwendet_zu10"] == 0.0
+    assert result.loc[3, "unterdeckung"] == pytest.approx(800.0)
+
+
+def test_berechne_mittelverwendung_rfb_finanziert_nur_regelgebundenen_bedarf(
+    bestand_mittel, mittelquellen_config,
+):
+    cfg = mittelquellen_config.copy()
+    cfg.loc[cfg["quelle_id"] == "zu10", "aktiv"] = False
+    cfg.loc[cfg["quelle_id"] == "rfb_frei", "betrag_euro"] = 1000.0
+    res_limitierung = pd.DataFrame({"einmaleinlage": [0.0, 200.0, 0.0, 300.0]})
+
+    result = berechne_mittelverwendung(bestand_mittel, res_limitierung, cfg)
+
+    assert result["mittel_verwendet_rfb_frei"].tolist() == pytest.approx([0.0, 200.0, 0.0, 300.0])
+    assert result["finanziert_gesamt"].tolist() == pytest.approx([0.0, 200.0, 0.0, 300.0])
+    assert result["unterdeckung"].sum() == pytest.approx(0.0)
+
+
+def test_berechne_mittelverwendung_fallback_reihenfolge_zu10_vor_rfb(
+    bestand_mittel, mittelquellen_config,
+):
+    cfg = mittelquellen_config.copy()
+    cfg.loc[cfg["quelle_id"] == "rfb_frei", "betrag_euro"] = 2700.0
+    res_limitierung = pd.DataFrame({"einmaleinlage": [800.0, 800.0, 800.0, 800.0]})
+
+    result = berechne_mittelverwendung(bestand_mittel, res_limitierung, cfg)
+
+    assert result.loc[0, "mittel_verwendet_zu10"] == pytest.approx(500.0)
+    assert result.loc[0, "mittel_verwendet_rfb_frei"] == pytest.approx(300.0)
+    assert result["mittel_verwendet_rfb_frei"].sum() == pytest.approx(2700.0)
+    assert result["unterdeckung"].sum() == pytest.approx(0.0)
+
+
 def test_berechne_mittelverwendung_fallback_globaler_topf_deckt_rest(bestand_mittel, mittelquellen_config):
     res_limitierung = pd.DataFrame({"einmaleinlage": [800.0, 800.0, 800.0, 800.0]})
 

@@ -77,7 +77,7 @@ Erwartete Dateien:
 - tarife.csv
 - ausscheideordnung.csv
 
-Optional fuer die geplante Mittelquellen-Erweiterung:
+Optional fuer die Mittelquellen-Erweiterung:
 
 - mittelquellen_config.csv
 
@@ -108,7 +108,7 @@ Optional genutzt (wenn vorhanden):
 - ueberzins_mittel_euro
 - zu10_mittel_euro
 
-Die optionalen Mittelspalten muessen numerisch und nicht negativ sein. Sie werden fuer die geplante Mittelquellen-Erweiterung als Einmaleinlagen-/Kapitalwertbetraege interpretiert, sofern in der Mittelquellen-Konfiguration keine andere Einheit gesetzt wird.
+Die optionalen Mittelspalten muessen numerisch und nicht negativ sein. Sie werden fuer die Mittelquellen-Erweiterung als Einmaleinlagen-/Kapitalwertbetraege interpretiert, sofern in der Mittelquellen-Konfiguration keine andere Einheit gesetzt wird.
 
 Beim Laden wird automatisch eine Altersgruppe erzeugt (`altersgruppe`).
 
@@ -133,7 +133,7 @@ Erwartete Schluesselspalten:
 
 ### 4) mittelquellen_config.csv (optional)
 
-Die Datei beschreibt die geplanten Mittelquellen fuer die spaetere Topfsteuerung. Sie wird vom Mock-Daten-Generator bereits als Beispiel erzeugt und enthaelt u. a. folgende Spalten:
+Die Datei beschreibt die Mittelquellen fuer die Topfsteuerung. Sie wird vom Mock-Daten-Generator bereits als Beispiel erzeugt und enthaelt u. a. folgende Spalten:
 
 - quelle_id
 - name
@@ -198,17 +198,17 @@ Bereitgestellte Funktionen:
 - Bubble-Chart zur Effizienz des RfB-Einsatzes
 - Gruppierte Detailanalyse und Export
 
-## Geplante Erweiterung: Mittelquellen und Topfsteuerung
+## Mittelquellen und Topfsteuerung
 
-Die naechste fachliche Erweiterung fuehrt getrennte Mittelquellen fuer die Limitierung ein. Der Umsetzungsplan ist in [docs/mittelquellen_umsetzungsplan.md](docs/mittelquellen_umsetzungsplan.md) dokumentiert und dient als Grundlage fuer die folgenden Implementierungsphasen.
+Die fachliche Erweiterung fuehrt getrennte Mittelquellen fuer die Limitierung ein. Der Umsetzungsplan und das Testprotokoll sind in [docs/mittelquellen_umsetzungsplan.md](docs/mittelquellen_umsetzungsplan.md) dokumentiert.
 
-Geplante fachliche Leitplanken:
+Fachliche Leitplanken:
 
 - Mittelquellen koennen freie RfB, Ueberzinsen, ZU10-Mittel aus der Vollversicherung oder weitere frei definierbare Toepfe sein.
 - Je Topf soll konfigurierbar sein, ob er den UI-Limitierungsregeln unterliegt oder regelunabhaengig vorab zur Beitragsentlastung eingesetzt wird.
-- Ueberzins wird als regelunabhaengige Pflichtquelle geplant und soll soweit moeglich vollstaendig zur Reduktion der Beitragsanpassung verwendet werden.
-- ZU10-Mittel werden als zeilenindividuelle externe Betragsspalte geplant und standardmaessig nur fuer Vollversicherte ab Alter 65 regelgebunden eingesetzt.
-- Externe Mittelspalten werden fuer die Erstimplementierung als Einmaleinlagen-/Kapitalwertbetraege interpretiert; laufende Monatsbetraege muessen spaeter explizit gekennzeichnet werden.
+- Ueberzins wird als regelunabhaengige Pflichtquelle soweit moeglich vollstaendig zur Reduktion der Beitragsanpassung verwendet.
+- ZU10-Mittel werden als zeilenindividuelle externe Betragsspalte standardmaessig nur fuer Vollversicherte ab Alter 65 regelgebunden eingesetzt.
+- Externe Mittelspalten werden als Einmaleinlagen-/Kapitalwertbetraege interpretiert; laufende Monatsbetraege muessen explizit gekennzeichnet werden.
 - Die bestehende Limitierungsrechnung bleibt rueckwaertskompatibel; neue Mittelquellen-Spalten werden additiv fuer Finanzierungsnachweis, Unterdeckung und Export ergaenzt.
 
 Technischer Stand:
@@ -217,6 +217,7 @@ Technischer Stand:
 - Die Service-Schicht `services/mittelverwendung.py` stellt die regelunabhaengige Vorab-Entlastung und die regelgebundene Finanzierungszuordnung bereit.
 - Die UI-Anbindung fuer die Mittelkonfiguration ist vorhanden und speichert die validierte Konfiguration im Session-State.
 - Die Orchestrierung in der Limitierungsrechnung ist integriert; das bestehende RfB-Budget wird in die freie RfB-Quelle gespiegelt.
+- Die Regressionstests fuer Ueberzins, ZU10-Altersgrenze, freie RfB, Fallback, Validierung, Rueckwaertskompatibilitaet und Exportspalten sind umgesetzt.
 
 ## Mathematischer Kern (vereinfacht)
 
