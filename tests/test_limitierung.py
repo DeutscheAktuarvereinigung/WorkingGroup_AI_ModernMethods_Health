@@ -7,12 +7,261 @@ import pandas as pd
 import pytest
 
 from services.limitierung import (
+    _ermittle_bwf_werte,
+    _wende_personen_cap_an,
     berechne_barwertfaktoren,
     berechne_barwertfaktoren_befristet,
     berechne_limitierung,
     berechne_limitierung_person,
     berechne_sensitivitaet,
 )
+
+
+def _barwertfaktoren_referenz(df_ao: pd.DataFrame, df_tarife: pd.DataFrame) -> pd.DataFrame:
+    """Referenz aus der bisherigen Schleifenlogik (vor Phase A)."""
+    ergebnisse = []
+    for _, tarif in df_tarife.iterrows():
+        tid = tarif["tarif_id"]
+        i = tarif["rechnungszins"]
+        v = 1.0 / (1.0 + i)
+
+        for geschl in ["M", "W"]:
+            ao_teil = df_ao[(df_ao["tarif_id"] == tid) & (df_ao["geschlecht"] == geschl)].sort_values("alter")
+            if len(ao_teil) == 0:
+                continue
+
+            qx_arr = ao_teil["qx"].values
+            wx_arr = ao_teil["storno"].values
+            max_alter = len(qx_arr)
+
+            for x in range(max_alter):
+                ax = 0.0
+                tp = 1.0
+                for t in range(1, max_alter - x):
+                    alter_idx = x + t - 1
+                    if alter_idx >= max_alter:
+                        break
+                    ausch = min(qx_arr[alter_idx] + wx_arr[alter_idx], 1.0)
+                    tp *= (1.0 - ausch)
+                    if tp < 1e-10:
+                        break
+                    ax += (v ** t) * tp
+
+                ergebnisse.append({
+                    "tarif_id": tid,
+                    "geschlecht": geschl,
+                    "alter": x,
+                    "barwertfaktor": round(ax, 6),
+                })
+
+    return pd.DataFrame(ergebnisse)
+
+
+def _barwertfaktoren_befristet_referenz(
+    df_ao: pd.DataFrame,
+    df_tarife: pd.DataFrame,
+    laufzeit_jahre: int,
+) -> pd.DataFrame:
+    """Referenz aus der bisherigen Schleifenlogik (vor Phase A)."""
+    ergebnisse = []
+    for _, tarif in df_tarife.iterrows():
+        tid = tarif["tarif_id"]
+        i = tarif["rechnungszins"]
+        v = 1.0 / (1.0 + i)
+
+        for geschl in ["M", "W"]:
+            ao_teil = df_ao[(df_ao["tarif_id"] == tid) & (df_ao["geschlecht"] == geschl)].sort_values("alter")
+            if len(ao_teil) == 0:
+                continue
+
+            qx_arr = ao_teil["qx"].values
+            wx_arr = ao_teil["storno"].values
+            max_alter = len(qx_arr)
+
+            for x in range(max_alter):
+                ax = 0.0
+                tp = 1.0
+                for t in range(1, min(laufzeit_jahre + 1, max_alter - x)):
+                    alter_idx = x + t - 1
+                    if alter_idx >= max_alter:
+                        break
+                    ausch = min(qx_arr[alter_idx] + wx_arr[alter_idx], 1.0)
+                    tp *= (1.0 - ausch)
+                    if tp < 1e-10:
+                        break
+                    ax += (v ** t) * tp
+
+                ergebnisse.append({
+                    "tarif_id": tid,
+                    "geschlecht": geschl,
+                    "alter": x,
+                    "barwertfaktor_befristet": round(ax, 6),
+                })
+
+    return pd.DataFrame(ergebnisse)
+
+
+def _wende_personen_cap_an_referenz(
+    person_ids: np.ndarray,
+    erh_abs: np.ndarray,
+    praemie_alt: np.ndarray,
+    ziel_abs: float | None,
+    ziel_pct: float | None,
+    verteilungsmodus: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Referenz aus der bisherigen pandas-groupby Schleifenlogik (vor Phase B)."""
+    n = len(person_ids)
+    erh_abs_neu = erh_abs.copy()
+    erh_person_vorher = np.zeros(n)
+    erh_person_nachher = np.zeros(n)
+    person_limitiert = np.zeros(n, dtype=bool)
+
+    df_temp = pd.DataFrame({
+        "person_id": person_ids,
+        "erh_abs": erh_abs,
+        "praemie_alt": praemie_alt,
+        "_idx": np.arange(n),
+    })
+
+    for _, grp in df_temp.groupby("person_id"):
+        idx = grp["_idx"].values
+        erh_gruppe = erh_abs_neu[idx]
+        praemie_gruppe = grp["praemie_alt"].values
+
+        gesamt_erh = erh_gruppe.sum()
+        gesamt_praemie = praemie_gruppe.sum()
+        erh_person_vorher[idx] = gesamt_erh
+
+        cap = np.inf
+        if ziel_abs is not None:
+            cap = min(cap, ziel_abs)
+        if ziel_pct is not None and gesamt_praemie > 0:
+            cap = min(cap, gesamt_praemie * ziel_pct / 100.0)
+
+        if gesamt_erh <= cap or cap == np.inf:
+            erh_person_nachher[idx] = gesamt_erh
+            continue
+
+        person_limitiert[idx] = True
+        reduktion = gesamt_erh - cap
+
+        if verteilungsmodus == "proportional":
+            gesamt = erh_gruppe.sum()
+            if gesamt > 0:
+                anteile = erh_gruppe / gesamt
+                erh_abs_neu[idx] = np.maximum(erh_gruppe - reduktion * anteile, 0.0)
+        elif verteilungsmodus == "groesster_zuerst":
+            result = erh_gruppe.copy()
+            sort_idx = np.argsort(-result)
+            rest = reduktion
+            for i in sort_idx:
+                if rest <= 0:
+                    break
+                moegliche_reduktion = min(rest, result[i])
+                result[i] -= moegliche_reduktion
+                rest -= moegliche_reduktion
+            erh_abs_neu[idx] = result
+        else:
+            raise ValueError(f"Unbekannter Verteilungsmodus: '{verteilungsmodus}'.")
+
+        erh_person_nachher[idx] = erh_abs_neu[idx].sum()
+
+    return erh_abs_neu, erh_person_vorher, erh_person_nachher, person_limitiert
+
+
+def _berechne_limitierung_person_phase_c_referenz(
+    df: pd.DataFrame,
+    df_bwf: pd.DataFrame,
+    regeln: list,
+    personen_regel: dict,
+    modus: str,
+    laufzeit_jahre: int,
+    reihenfolge: str,
+    verteilungsmodus: str,
+) -> pd.DataFrame:
+    """Referenz aus der Vor-Phase-C-Logik (redundante BWF-Merges in den Personenpfaden)."""
+    person_ziel_abs = personen_regel.get("ziel_abs")
+    person_ziel_pct = personen_regel.get("ziel_pct")
+
+    if person_ziel_abs is None and person_ziel_pct is None:
+        res_tarif = berechne_limitierung(df, df_bwf, regeln, modus, laufzeit_jahre)
+        res_tarif["erhoehung_person_gesamt_vorher"] = np.nan
+        res_tarif["erhoehung_person_gesamt_nachher"] = np.nan
+        res_tarif["person_limitiert"] = False
+        return res_tarif
+
+    if reihenfolge == "tarif_zuerst":
+        res_tarif = berechne_limitierung(df, df_bwf, regeln, modus, laufzeit_jahre)
+
+        erh_nach_tarif = res_tarif["erhoehung_limitiert_abs"].values
+        praemie_alt = df["praemie_alt_monatlich"].values
+        person_ids = df["person_id"].values
+
+        erh_abs_neu, erh_p_vorher, erh_p_nachher, p_lim = _wende_personen_cap_an_referenz(
+            person_ids, erh_nach_tarif, praemie_alt,
+            person_ziel_abs, person_ziel_pct, verteilungsmodus,
+        )
+
+        res_tarif["erhoehung_limitiert_abs"] = np.round(erh_abs_neu, 2)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            res_tarif["erhoehung_limitiert_pct"] = np.round(
+                np.where(praemie_alt > 0, erh_abs_neu / praemie_alt * 100.0, 0.0), 2
+            )
+        res_tarif["praemie_limitiert"] = np.round(praemie_alt + erh_abs_neu, 2)
+
+        erh_abs_orig = df["erhoehung_absolut"].values
+        diff_monatlich = np.maximum(erh_abs_orig - erh_abs_neu, 0.0)
+        res_tarif["differenz_monatlich"] = np.round(diff_monatlich, 2)
+
+        bwf_merged = df[["tarif_id", "geschlecht", "alter"]].merge(
+            df_bwf, on=["tarif_id", "geschlecht", "alter"], how="left"
+        )
+        bwf_werte = bwf_merged["barwertfaktor"].fillna(0).values
+        res_tarif["einmaleinlage"] = np.round(diff_monatlich * 12 * bwf_werte, 2)
+        res_tarif["limitiert"] = diff_monatlich > 0.01
+
+        res_tarif["erhoehung_person_gesamt_vorher"] = np.round(erh_p_vorher, 2)
+        res_tarif["erhoehung_person_gesamt_nachher"] = np.round(erh_p_nachher, 2)
+        res_tarif["person_limitiert"] = p_lim
+        return res_tarif
+
+    if reihenfolge == "person_zuerst":
+        erh_abs_orig = df["erhoehung_absolut"].values
+        praemie_alt = df["praemie_alt_monatlich"].values
+        person_ids = df["person_id"].values
+
+        erh_abs_nach_person, erh_p_vorher, erh_p_nachher, p_lim = _wende_personen_cap_an_referenz(
+            person_ids, erh_abs_orig, praemie_alt,
+            person_ziel_abs, person_ziel_pct, verteilungsmodus,
+        )
+
+        df_mod = df.copy()
+        df_mod["erhoehung_absolut"] = np.round(erh_abs_nach_person, 2)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            df_mod["erhoehung_prozent"] = np.round(
+                np.where(praemie_alt > 0, erh_abs_nach_person / praemie_alt * 100.0, 0.0), 2
+            )
+        df_mod["praemie_neu_monatlich"] = np.round(praemie_alt + erh_abs_nach_person, 2)
+
+        res_tarif = berechne_limitierung(df_mod, df_bwf, regeln, modus, laufzeit_jahre)
+
+        erh_abs_final = res_tarif["erhoehung_limitiert_abs"].values
+        diff_monatlich = np.maximum(erh_abs_orig - erh_abs_final, 0.0)
+        res_tarif["differenz_monatlich"] = np.round(diff_monatlich, 2)
+
+        bwf_merged = df[["tarif_id", "geschlecht", "alter"]].merge(
+            df_bwf, on=["tarif_id", "geschlecht", "alter"], how="left"
+        )
+        bwf_werte = bwf_merged["barwertfaktor"].fillna(0).values
+        res_tarif["einmaleinlage"] = np.round(diff_monatlich * 12 * bwf_werte, 2)
+        res_tarif["limitiert"] = diff_monatlich > 0.01
+
+        res_tarif["erhoehung_person_gesamt_vorher"] = np.round(erh_p_vorher, 2)
+        res_tarif["erhoehung_person_gesamt_nachher"] = np.round(erh_p_nachher, 2)
+        res_tarif["person_limitiert"] = p_lim
+        return res_tarif
+
+    raise ValueError("Unbekannte Reihenfolge in Referenz.")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -69,6 +318,17 @@ class TestBerechneBarwertfaktoren:
         bwf = berechne_barwertfaktoren(ausscheideordnung, tarife)
         assert set(bwf["geschlecht"].unique()) == {"M", "W"}
 
+    def test_regression_identisch_zur_referenzlogik(self, ausscheideordnung, tarife):
+        """Phase A: Vektorisierung darf fachliche Ergebnisse nicht verändern."""
+        neu = berechne_barwertfaktoren(ausscheideordnung, tarife).sort_values(
+            ["tarif_id", "geschlecht", "alter"]
+        ).reset_index(drop=True)
+        alt = _barwertfaktoren_referenz(ausscheideordnung, tarife).sort_values(
+            ["tarif_id", "geschlecht", "alter"]
+        ).reset_index(drop=True)
+
+        pd.testing.assert_frame_equal(neu, alt, check_dtype=False)
+
 
 class TestBerechneBarwertfaktorenBefristet:
 
@@ -98,6 +358,18 @@ class TestBerechneBarwertfaktorenBefristet:
     def test_positiv(self, ausscheideordnung, tarife):
         bwf = berechne_barwertfaktoren_befristet(ausscheideordnung, tarife, laufzeit_jahre=10)
         assert (bwf["barwertfaktor_befristet"] >= 0).all()
+
+    def test_regression_identisch_zur_referenzlogik(self, ausscheideordnung, tarife):
+        """Phase A: Vektorisierung darf fachliche Ergebnisse nicht verändern."""
+        laufzeit = 10
+        neu = berechne_barwertfaktoren_befristet(
+            ausscheideordnung, tarife, laufzeit_jahre=laufzeit
+        ).sort_values(["tarif_id", "geschlecht", "alter"]).reset_index(drop=True)
+        alt = _barwertfaktoren_befristet_referenz(
+            ausscheideordnung, tarife, laufzeit_jahre=laufzeit
+        ).sort_values(["tarif_id", "geschlecht", "alter"]).reset_index(drop=True)
+
+        pd.testing.assert_frame_equal(neu, alt, check_dtype=False)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -489,3 +761,88 @@ class TestBerechneLimitierungPerson:
         )
         assert (res["einmaleinlage"] >= 0).all()
         assert res.loc[res["limitiert"], "einmaleinlage"].sum() > 0
+
+
+class TestWendePersonenCapRegression:
+
+    @pytest.mark.parametrize("modus", ["proportional", "groesster_zuerst"])
+    def test_identisch_zur_referenzlogik_abs_cap(self, bestand_mit_personen, modus):
+        """Phase B: Optimierung darf Ergebnisse für ziel_abs nicht verändern."""
+        person_ids = bestand_mit_personen["person_id"].to_numpy()
+        erh_abs = bestand_mit_personen["erhoehung_absolut"].to_numpy(dtype=float)
+        praemie_alt = bestand_mit_personen["praemie_alt_monatlich"].to_numpy(dtype=float)
+
+        neu = _wende_personen_cap_an(
+            person_ids, erh_abs, praemie_alt,
+            ziel_abs=100.0, ziel_pct=None, verteilungsmodus=modus,
+        )
+        alt = _wende_personen_cap_an_referenz(
+            person_ids, erh_abs, praemie_alt,
+            ziel_abs=100.0, ziel_pct=None, verteilungsmodus=modus,
+        )
+
+        np.testing.assert_allclose(neu[0], alt[0], atol=1e-10)
+        np.testing.assert_allclose(neu[1], alt[1], atol=1e-10)
+        np.testing.assert_allclose(neu[2], alt[2], atol=1e-10)
+        np.testing.assert_array_equal(neu[3], alt[3])
+
+    def test_identisch_zur_referenzlogik_pct_cap(self, bestand_mit_personen):
+        """Phase B: Optimierung darf Ergebnisse für ziel_pct nicht verändern."""
+        person_ids = bestand_mit_personen["person_id"].to_numpy()
+        erh_abs = bestand_mit_personen["erhoehung_absolut"].to_numpy(dtype=float)
+        praemie_alt = bestand_mit_personen["praemie_alt_monatlich"].to_numpy(dtype=float)
+
+        neu = _wende_personen_cap_an(
+            person_ids, erh_abs, praemie_alt,
+            ziel_abs=None, ziel_pct=10.0, verteilungsmodus="proportional",
+        )
+        alt = _wende_personen_cap_an_referenz(
+            person_ids, erh_abs, praemie_alt,
+            ziel_abs=None, ziel_pct=10.0, verteilungsmodus="proportional",
+        )
+
+        np.testing.assert_allclose(neu[0], alt[0], atol=1e-10)
+        np.testing.assert_allclose(neu[1], alt[1], atol=1e-10)
+        np.testing.assert_allclose(neu[2], alt[2], atol=1e-10)
+        np.testing.assert_array_equal(neu[3], alt[3])
+
+
+class TestPhaseCMergeRegression:
+
+    def test_bwf_werte_helper_identisch_zum_merge(self, bestand_mit_personen, barwertfaktoren):
+        """Helper liefert exakt dieselben BWF-Werte wie der direkte Merge."""
+        bwf_ref = bestand_mit_personen[["tarif_id", "geschlecht", "alter"]].merge(
+            barwertfaktoren, on=["tarif_id", "geschlecht", "alter"], how="left"
+        )["barwertfaktor"].fillna(0).values
+        bwf_neu = _ermittle_bwf_werte(bestand_mit_personen, barwertfaktoren)
+        np.testing.assert_allclose(bwf_neu, bwf_ref, atol=1e-12)
+
+    @pytest.mark.parametrize("reihenfolge", ["tarif_zuerst", "person_zuerst"])
+    def test_berechne_limitierung_person_identisch_zur_vorphase_c(self, bestand_mit_personen, barwertfaktoren, reihenfolge):
+        """Phase C: Ergebnis muss identisch zur Variante mit redundanten Merges bleiben."""
+        regeln = [{"ziel_pct": 25.0, "ziel_abs": None, "scope_spalte": None, "scope_werte": None}]
+        personen_regel = {"ziel_abs": 80.0}
+
+        neu = berechne_limitierung_person(
+            bestand_mit_personen,
+            barwertfaktoren,
+            regeln,
+            personen_regel,
+            "full",
+            10,
+            reihenfolge=reihenfolge,
+            verteilungsmodus="proportional",
+        ).sort_index(axis=1)
+
+        alt = _berechne_limitierung_person_phase_c_referenz(
+            bestand_mit_personen,
+            barwertfaktoren,
+            regeln,
+            personen_regel,
+            "full",
+            10,
+            reihenfolge,
+            "proportional",
+        ).sort_index(axis=1)
+
+        pd.testing.assert_frame_equal(neu, alt, check_dtype=False)

@@ -77,6 +77,10 @@ Erwartete Dateien:
 - tarife.csv
 - ausscheideordnung.csv
 
+Optional fuer die Mittelquellen-Erweiterung:
+
+- mittelquellen_config.csv
+
 Separator in allen CSV-Dateien: Semikolon `;`
 
 ## Erwartete Datenformate
@@ -101,6 +105,10 @@ Mindestens folgende Spalten sind erforderlich:
 Optional genutzt (wenn vorhanden):
 
 - erhoehung_historisch_kumuliert
+- ueberzins_mittel_euro
+- zu10_mittel_euro
+
+Die optionalen Mittelspalten muessen numerisch und nicht negativ sein. Sie werden fuer die Mittelquellen-Erweiterung als Einmaleinlagen-/Kapitalwertbetraege interpretiert, sofern in der Mittelquellen-Konfiguration keine andere Einheit gesetzt wird.
 
 Beim Laden wird automatisch eine Altersgruppe erzeugt (`altersgruppe`).
 
@@ -123,6 +131,28 @@ Erwartete Schluesselspalten:
 - qx
 - storno
 
+### 4) mittelquellen_config.csv (optional)
+
+Die Datei beschreibt die Mittelquellen fuer die Topfsteuerung. Sie wird vom Mock-Daten-Generator bereits als Beispiel erzeugt und enthaelt u. a. folgende Spalten:
+
+- quelle_id
+- name
+- aktiv
+- prioritaet
+- typ
+- betrag_euro
+- betrag_spalte
+- betrag_einheit
+- unterliegt_limitierungsregeln
+- einsatzmodus
+- anwendungsphase
+- filter_spalten
+- filter_operatoren
+- filter_werte
+- fallback_erlaubt
+
+Referenzierte `betrag_spalte`- und `filter_spalten`-Werte muessen im Bestand vorhanden sein; fehlende Spalten gelten als fachlicher Fehler.
+
 ## Bedienung in der App
 
 ## Tab 1: Bestandsanalyse
@@ -141,7 +171,18 @@ Filterlogik:
 - Standardmaessig arbeitet die Analyse auf dem geladenen Gesamtbestand
 - Nach Klick auf Filter anwenden wird mit der gesetzten UND/ODER-Logik fuer Prozent- und Euro-Grenzen gefiltert
 
-## Tab 2: Limitierungsrechnung
+## Tab 2: Mittelkonfiguration
+
+Bereitgestellte Funktionen:
+
+- Optionales Laden einer `mittelquellen_config.csv` oder Erzeugung einer Default-Konfiguration
+- Aktivierung/Deaktivierung einzelner Mittelquellen
+- Konfiguration von Prioritaet, Typ, Betragsspalte oder globalem Betrag
+- Steuerung, ob ein Topf den Limitierungsregeln unterliegt
+- Berechtigungsfilter, z. B. fuer ZU10 mit `tarifart == voll` und `alter >= 65`
+- Validierung der Konfiguration gegen den geladenen Bestand
+
+## Tab 3: Limitierungsrechnung
 
 Bereitgestellte Funktionen:
 
@@ -150,10 +191,33 @@ Bereitgestellte Funktionen:
 - Sensitivitaetsanalyse ueber ein Zielraster
 - Limitierungsberechnung inkl. Budgetvergleich
 - Optional befristete Limitierung (Mischung dauerhaft/befristet)
+- Integration der Mittelquellen-Konfiguration: regelunabhaengige Vorab-Entlastung, regelgebundene Finanzierung, Unterdeckung und Finanzierungsquote
 - Treemap der verwendeten RfB-Mittel
+- Balkendiagramm der verwendeten Mittel je Quelle
 - Spitzenreduktion nach Alter (P90/P95/P99/Maximum)
 - Bubble-Chart zur Effizienz des RfB-Einsatzes
 - Gruppierte Detailanalyse und Export
+
+## Mittelquellen und Topfsteuerung
+
+Die fachliche Erweiterung fuehrt getrennte Mittelquellen fuer die Limitierung ein. Der Umsetzungsplan und das Testprotokoll sind in [docs/mittelquellen_umsetzungsplan.md](docs/mittelquellen_umsetzungsplan.md) dokumentiert.
+
+Fachliche Leitplanken:
+
+- Mittelquellen koennen freie RfB, Ueberzinsen, ZU10-Mittel aus der Vollversicherung oder weitere frei definierbare Toepfe sein.
+- Je Topf soll konfigurierbar sein, ob er den UI-Limitierungsregeln unterliegt oder regelunabhaengig vorab zur Beitragsentlastung eingesetzt wird.
+- Ueberzins wird als regelunabhaengige Pflichtquelle soweit moeglich vollstaendig zur Reduktion der Beitragsanpassung verwendet.
+- ZU10-Mittel werden als zeilenindividuelle externe Betragsspalte standardmaessig nur fuer Vollversicherte ab Alter 65 regelgebunden eingesetzt.
+- Externe Mittelspalten werden als Einmaleinlagen-/Kapitalwertbetraege interpretiert; laufende Monatsbetraege muessen explizit gekennzeichnet werden.
+- Die bestehende Limitierungsrechnung bleibt rueckwaertskompatibel; neue Mittelquellen-Spalten werden additiv fuer Finanzierungsnachweis, Unterdeckung und Export ergaenzt.
+
+Technischer Stand:
+
+- Die Mockdaten und die CSV-Validierung enthalten bereits die Mittelspalten und eine Beispiel-Konfiguration.
+- Die Service-Schicht `services/mittelverwendung.py` stellt die regelunabhaengige Vorab-Entlastung und die regelgebundene Finanzierungszuordnung bereit.
+- Die UI-Anbindung fuer die Mittelkonfiguration ist vorhanden und speichert die validierte Konfiguration im Session-State.
+- Die Orchestrierung in der Limitierungsrechnung ist integriert; das bestehende RfB-Budget wird in die freie RfB-Quelle gespiegelt.
+- Die Regressionstests fuer Ueberzins, ZU10-Altersgrenze, freie RfB, Fallback, Validierung, Rueckwaertskompatibilitaet und Exportspalten sind umgesetzt.
 
 ## Mathematischer Kern (vereinfacht)
 
@@ -197,6 +261,7 @@ Erzeugte Dateien:
 - output_daten/tarife.csv
 - output_daten/ausscheideordnung.csv
 - output_daten/bestand.csv
+- output_daten/mittelquellen_config.csv
 
 Voraussetzung:
 
