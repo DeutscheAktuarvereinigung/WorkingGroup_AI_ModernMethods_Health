@@ -39,6 +39,7 @@ from ui.theme import (
 
 # ── Service-Importe (Business-Logik, von UI getrennt) ───────────────────────
 from services.data_loader import lade_csv as lade_csv_service   # CSV-Parsing und Validierung
+from services.snowflake_loader import lade_snowflake_schema as lade_snowflake_schema_service
 
 from services.bestandsanalyse import (
     berechne_hist_daten as berechne_hist_daten_service,                         # Histogramm-Rohdaten
@@ -118,6 +119,32 @@ def lade_csv(datei, name: str):
         st.error(str(exc))
         st.stop()
 
+@st.cache_data(show_spinner="Lade Daten aus Snowflake …", ttl=600)
+def lade_snowflake_schema(database, schema, bestand_tabelle, tarife_tabelle, ao_tabelle, mittelquellen_tabelle):
+    # Laedt Tabellen aus einem Snowflake-Schema und validiert den bestehenden Datenvertrag
+    try:
+        return lade_snowflake_schema_service(
+            database=database,
+            schema=schema,
+            bestand_tabelle=bestand_tabelle,
+            tarife_tabelle=tarife_tabelle,
+            ao_tabelle=ao_tabelle,
+            mittelquellen_tabelle=mittelquellen_tabelle,
+        )
+    except ValueError as exc:
+        st.error(str(exc))
+        st.stop()
+
+def speichere_geladene_daten(df_b, df_t, df_a, df_m):
+    # DataFrames im Session-State speichern (app-weite Datenhaltung)
+    st.session_state["df_bestand"] = df_b
+    st.session_state["df_tarife"] = df_t
+    st.session_state["df_ao"] = df_a
+    st.session_state["df_mittelquellen_config_geladen"] = df_m
+    # Gefilterten Bestand zurücksetzen, damit kein veralteter Filter verbleibt
+    st.session_state.pop("df_gefiltert", None)
+    st.session_state.pop("mittelquellen_config", None)
+
 @st.cache_data(show_spinner=False)
 def berechne_kpis(_hash, df):
     # _hash dient nur als Cache-Key (df selbst ist nicht hashbar)
@@ -153,8 +180,12 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     st.markdown("## 📂 Datenimport")
 
-    # Auswahl: Demo-Daten aus lokalem Verzeichnis oder manuelle CSV-Uploads
-    upload_modus = st.radio("Datenquelle", ["Mock-Daten (lokaler Pfad)", "CSV-Upload"], index=0)
+    # Auswahl: Demo-Daten aus lokalem Verzeichnis, manuelle CSV-Uploads oder Snowflake-Schema
+    upload_modus = st.radio(
+        "Datenquelle",
+        ["Mock-Daten (lokaler Pfad)", "CSV-Upload", "Snowflake-Schema"],
+        index=0,
+    )
 
     if upload_modus == "Mock-Daten (lokaler Pfad)":
         pfad = st.text_input("Verzeichnis", value="./output_daten")
@@ -168,14 +199,7 @@ with st.sidebar:
                     df_m, w_m = lade_csv(f"{pfad}/mittelquellen_config.csv", "mittelquellen")
                 except FileNotFoundError:
                     df_m, w_m = None, []
-                # DataFrames im Session-State speichern (app-weite Datenhaltung)
-                st.session_state["df_bestand"] = df_b
-                st.session_state["df_tarife"] = df_t
-                st.session_state["df_ao"] = df_a
-                st.session_state["df_mittelquellen_config_geladen"] = df_m
-                # Gefilterten Bestand zurücksetzen, damit kein veralteter Filter verbleibt
-                st.session_state.pop("df_gefiltert", None)
-                st.session_state.pop("mittelquellen_config", None)
+                speichere_geladene_daten(df_b, df_t, df_a, df_m)
                 st.success(f"✓ {len(df_b):,} Versicherte geladen")
                 alle_warnungen = w_b + w_t + w_a + w_m
                 for w in alle_warnungen:
@@ -185,7 +209,7 @@ with st.sidebar:
                 st.error(f"Datei nicht gefunden: {e}")
             except Exception as e:
                 st.error(f"Fehler: {e}")
-    else:
+    elif upload_modus == "CSV-Upload":
         # Upload-Widgets für alle drei Pflichtdateien
         f_b = st.file_uploader("bestand.csv", type="csv", key="up_b")
         f_t = st.file_uploader("tarife.csv", type="csv", key="up_t")
@@ -204,19 +228,44 @@ with st.sidebar:
                 df_m, w_m = lade_csv(f_m, "mittelquellen")
             else:
                 df_m, w_m = None, []
-            st.session_state["df_bestand"] = df_b
-            st.session_state["df_tarife"] = df_t
-            st.session_state["df_ao"] = df_a
-            st.session_state["df_mittelquellen_config_geladen"] = df_m
             if daten_geaendert:
-                st.session_state.pop("df_gefiltert", None)
-                st.session_state.pop("mittelquellen_config", None)
+                speichere_geladene_daten(df_b, df_t, df_a, df_m)
                 st.session_state["_upload_data_signature"] = upload_signature
+            else:
+                st.session_state["df_bestand"] = df_b
+                st.session_state["df_tarife"] = df_t
+                st.session_state["df_ao"] = df_a
+                st.session_state["df_mittelquellen_config_geladen"] = df_m
             st.success(f"✓ {len(df_b):,} Versicherte geladen")
             alle_warnungen = w_b + w_t + w_a + w_m
             for w in alle_warnungen:
                 st.warning(f"⚠️ {w}")
             logger.info("Daten geladen (Upload): %d Versicherte, %d Warnungen", len(df_b), len(alle_warnungen))
+    else:
+        st.caption(
+            "Lädt Tabellen über die aktive Snowflake-Session. "
+            "Schema- und Tabellennamen werden als Identifier validiert."
+        )
+        sf_database = st.text_input("Datenbank (optional)", value="")
+        sf_schema = st.text_input("Schema", value="PKV_LIMITIERUNG")
+        sf_bestand = st.text_input("Tabelle Bestand", value="BESTAND")
+        sf_tarife = st.text_input("Tabelle Tarife", value="TARIFE")
+        sf_ao = st.text_input("Tabelle Ausscheideordnung", value="AUSSCHEIDEORDNUNG")
+        sf_mittel = st.text_input("Tabelle Mittelquellen (optional)", value="MITTELQUELLEN_CONFIG")
+        if st.button("Daten aus Snowflake laden", type="primary", use_container_width=True):
+            df_b, df_t, df_a, df_m, alle_warnungen = lade_snowflake_schema(
+                sf_database.strip() or None,
+                sf_schema.strip(),
+                sf_bestand.strip(),
+                sf_tarife.strip(),
+                sf_ao.strip(),
+                sf_mittel.strip(),
+            )
+            speichere_geladene_daten(df_b, df_t, df_a, df_m)
+            st.success(f"✓ {len(df_b):,} Versicherte aus Snowflake geladen")
+            for w in alle_warnungen:
+                st.warning(f"⚠️ {w}")
+            logger.info("Daten geladen (Snowflake): %d Versicherte, %d Warnungen", len(df_b), len(alle_warnungen))
 
     df_bestand = st.session_state.get("df_bestand")  # Aktuell geladener Gesamtbestand
 

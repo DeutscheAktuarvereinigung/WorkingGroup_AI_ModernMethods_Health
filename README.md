@@ -13,7 +13,7 @@ Das Tool unterstuetzt zwei zentrale Aufgaben:
 
 Kernfunktionen:
 
-- Interaktiver Datenimport (lokaler Pfad oder CSV-Upload)
+- Interaktiver Datenimport (lokaler Pfad, CSV-Upload oder Snowflake-Schema)
 - Filterung nach Tarifwerk, Tarifart, Tarif, Geschlecht, Alter und Erhoehungsbereichen
 - KPI-, Verteilungs-, Struktur- und Detailanalysen im Tab Bestandsanalyse
 - Regelbasierte Limitierung (global und segmentbezogen)
@@ -66,10 +66,11 @@ Hinweise:
 
 ## Datenquelle und Import
 
-Die Sidebar bietet zwei Modi:
+Die Sidebar bietet drei Modi:
 
 - Mock-Daten (lokaler Pfad), Default `./output_daten`
 - CSV-Upload (3 Dateien)
+- Snowflake-Schema über die aktive Snowflake-Session
 
 Erwartete Dateien:
 
@@ -82,6 +83,15 @@ Optional fuer die Mittelquellen-Erweiterung:
 - mittelquellen_config.csv
 
 Separator in allen CSV-Dateien: Semikolon `;`
+
+Beim Snowflake-Import werden standardmaessig folgende Tabellen in einem gewaehlten Schema erwartet:
+
+- `BESTAND`
+- `TARIFE`
+- `AUSSCHEIDEORDNUNG`
+- `MITTELQUELLEN_CONFIG` (optional)
+
+Datenbank, Schema und Tabellennamen koennen in der Sidebar angepasst werden. Die App nutzt in Streamlit in Snowflake die aktive Snowpark-Session; Credentials sollten nicht in der App gepflegt werden. Snowflake-Spaltennamen werden auf Kleinschreibung normalisiert, sodass unquoted Snowflake-Spalten wie `VERSICHERTEN_ID` dem App-Datenvertrag `versicherten_id` entsprechen.
 
 ## Erwartete Datenformate
 

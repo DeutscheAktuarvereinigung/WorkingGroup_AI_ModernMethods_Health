@@ -12,6 +12,33 @@ ERLAUBTE_EINSATZMODI = {"pflicht_vollstaendig", "nur_bedarf_finanzieren", "optio
 ERLAUBTE_ANWENDUNGSPHASEN = {"vor_regeln", "nach_regeln"}
 
 
+def normalisiere_spaltennamen(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalisiert technische Spaltennamen fuer CSV- und Snowflake-Quellen."""
+    df = df.copy()
+    normalisierte_spalten = [str(spalte).strip().lower() for spalte in df.columns]
+    doppelte_spalten = pd.Index(normalisierte_spalten)[pd.Index(normalisierte_spalten).duplicated()].unique().tolist()
+    if doppelte_spalten:
+        raise ValueError(
+            "Doppelte Spalten nach Normalisierung gefunden: "
+            f"{doppelte_spalten}"
+        )
+    df.columns = normalisierte_spalten
+    return df
+
+
+def _stelle_numerische_spalten_sicher(df: pd.DataFrame, spalten: list[str], kontext: str = "Spalte") -> None:
+    """Konvertiert fachlich numerische Spalten defensiv, ohne ungueltige Werte zu dulden."""
+    for spalte in spalten:
+        if pd.api.types.is_numeric_dtype(df[spalte]):
+            continue
+        try:
+            df[spalte] = pd.to_numeric(df[spalte], errors="raise")
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"{kontext} '{spalte}' muss numerisch sein, ist aber '{df[spalte].dtype}'."
+            ) from exc
+
+
 def erzeuge_altersgruppen(df: pd.DataFrame, schritt: int = 10):
     alter_min = int(np.floor(df["alter"].min() / schritt) * schritt)
     alter_max = int(np.ceil((df["alter"].max() + 1) / schritt) * schritt)
@@ -34,16 +61,33 @@ def _split_filter_spalten(wert) -> list[str]:
     return [teil.strip() for teil in str(wert).split("|") if teil.strip()]
 
 
+def _normalisiere_pipe_referenzen(wert):
+    """Normalisiert pipe-getrennte Spaltenreferenzen auf den technischen Datenvertrag."""
+    if not _ist_gesetzt(wert):
+        return wert
+    return "|".join(teil.strip().lower() for teil in str(wert).split("|"))
+
+
+def _normalisiere_mittelquellen_config(df_config: pd.DataFrame) -> pd.DataFrame:
+    """Normalisiert technische Referenzen in der Mittelquellen-Konfiguration."""
+    df_config = df_config.copy()
+    for spalte in ["typ", "betrag_einheit", "einsatzmodus", "anwendungsphase"]:
+        if spalte in df_config.columns:
+            df_config[spalte] = df_config[spalte].astype(str).str.strip().str.lower()
+    if "betrag_spalte" in df_config.columns:
+        df_config["betrag_spalte"] = df_config["betrag_spalte"].apply(_normalisiere_pipe_referenzen)
+    if "filter_spalten" in df_config.columns:
+        df_config["filter_spalten"] = df_config["filter_spalten"].apply(_normalisiere_pipe_referenzen)
+    return df_config
+
+
 def _validiere_optionale_mittelspalten(df: pd.DataFrame, spalten: list[str] | None = None) -> None:
     """Validiert optionale Mittelspalten im Bestand, sofern sie vorhanden sind."""
     pruef_spalten = spalten if spalten is not None else OPTIONALE_MITTELSPALTEN
     for spalte in pruef_spalten:
         if spalte not in df.columns:
             continue
-        if not pd.api.types.is_numeric_dtype(df[spalte]):
-            raise ValueError(
-                f"Spalte '{spalte}' muss numerisch sein, ist aber '{df[spalte].dtype}'."
-            )
+        _stelle_numerische_spalten_sicher(df, [spalte])
         if df[spalte].isna().any():
             raise ValueError(f"Spalte '{spalte}' enthält fehlende Werte (NaN).")
         if (df[spalte] < 0).any():
@@ -76,8 +120,7 @@ def validiere_mittelquellen_config(
         raise ValueError("Mittelquellen: quelle_id enthält fehlende Werte.")
     if df_config["quelle_id"].duplicated().any():
         raise ValueError("Mittelquellen: quelle_id muss eindeutig sein.")
-    if not pd.api.types.is_numeric_dtype(df_config["prioritaet"]):
-        raise ValueError("Mittelquellen: 'prioritaet' muss numerisch sein.")
+    _stelle_numerische_spalten_sicher(df_config, ["prioritaet"], "Mittelquellen")
     if (df_config["prioritaet"] < 1).any():
         raise ValueError("Mittelquellen: 'prioritaet' muss >= 1 sein.")
 
@@ -171,11 +214,7 @@ def _validiere_bestand(df: pd.DataFrame) -> list[str]:
         "erhoehung_absolut", "erhoehung_prozent", "alterungsrueckstellung",
         "versicherungsdauer_jahre",
     ]
-    for spalte in numerische_spalten:
-        if not pd.api.types.is_numeric_dtype(df[spalte]):
-            raise ValueError(
-                f"Spalte '{spalte}' muss numerisch sein, ist aber '{df[spalte].dtype}'."
-            )
+    _stelle_numerische_spalten_sicher(df, numerische_spalten)
 
     # --- NaN-Prüfung ---
     kritische_spalten = [
@@ -271,10 +310,7 @@ def _validiere_tarife(df: pd.DataFrame) -> list[str]:
     if df["tarif_id"].isna().any():
         raise ValueError("Tarife: tarif_id enthält fehlende Werte.")
 
-    if not pd.api.types.is_numeric_dtype(df["rechnungszins"]):
-        raise ValueError(
-            f"Tarife: 'rechnungszins' muss numerisch sein, ist aber '{df['rechnungszins'].dtype}'."
-        )
+    _stelle_numerische_spalten_sicher(df, ["rechnungszins"], "Tarife")
 
     if (df["rechnungszins"] < 0).any() or (df["rechnungszins"] > 0.10).any():
         warnungen.append("Tarife: rechnungszins außerhalb [0, 0.10] gefunden.")
@@ -292,12 +328,8 @@ def _validiere_ausscheideordnung(df: pd.DataFrame) -> list[str]:
     if fehlende:
         raise ValueError(f"Ausscheideordnung: Fehlende Spalten: {fehlende}")
 
+    _stelle_numerische_spalten_sicher(df, ["qx", "storno"], "Ausscheideordnung")
     for spalte in ["qx", "storno"]:
-        if not pd.api.types.is_numeric_dtype(df[spalte]):
-            raise ValueError(
-                f"Ausscheideordnung: '{spalte}' muss numerisch sein, "
-                f"ist aber '{df[spalte].dtype}'."
-            )
         if df[spalte].isna().any():
             raise ValueError(f"Ausscheideordnung: '{spalte}' enthält fehlende Werte.")
         if (df[spalte] < 0).any() or (df[spalte] > 1).any():
@@ -308,16 +340,16 @@ def _validiere_ausscheideordnung(df: pd.DataFrame) -> list[str]:
     return warnungen
 
 
-def lade_csv(datei, name: str) -> tuple[pd.DataFrame, list[str]]:
-    """Lädt eine CSV-Datei und validiert sie.
+def validiere_dataframe(df: pd.DataFrame, name: str) -> tuple[pd.DataFrame, list[str]]:
+    """Normalisiert und validiert einen fachlichen Daten-DataFrame.
 
     Returns:
         Tuple aus (DataFrame, Liste von Warnungen).
     """
-    logger.info("Lade CSV: name=%s", name)
-    df = pd.read_csv(datei, sep=";", low_memory=False)
-    logger.info("CSV geladen: %d Zeilen, %d Spalten", len(df), len(df.columns))
+    df = normalisiere_spaltennamen(df)
     warnungen: list[str] = []
+    if name == "mittelquellen":
+        df = _normalisiere_mittelquellen_config(df)
 
     if name == "bestand":
         erwartete = [
@@ -348,3 +380,15 @@ def lade_csv(datei, name: str) -> tuple[pd.DataFrame, list[str]]:
         warnungen = validiere_mittelquellen_config(df)
 
     return df, warnungen
+
+
+def lade_csv(datei, name: str) -> tuple[pd.DataFrame, list[str]]:
+    """Lädt eine CSV-Datei und validiert sie.
+
+    Returns:
+        Tuple aus (DataFrame, Liste von Warnungen).
+    """
+    logger.info("Lade CSV: name=%s", name)
+    df = pd.read_csv(datei, sep=";", low_memory=False)
+    logger.info("CSV geladen: %d Zeilen, %d Spalten", len(df), len(df.columns))
+    return validiere_dataframe(df, name)

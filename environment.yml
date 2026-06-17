@@ -2,6 +2,8 @@ name: sf_env
 channels:
   - snowflake
 dependencies:
+  - streamlit
+  - snowflake-snowpark-python
   - pandas
   - numpy
   - plotly
