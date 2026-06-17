@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from importlib import import_module
-from typing import Any
+from typing import Any, Callable
 
 import pandas as pd
 
@@ -72,6 +72,7 @@ def _lade_tabelle_als_dataframe(
     tabelle: str,
     name: str,
     optional: bool = False,
+    status_callback: Callable[[str], None] | None = None,
 ) -> tuple[pd.DataFrame | None, list[str]]:
     """Laedt eine Snowflake-Tabelle nach Pandas und validiert den Datenvertrag."""
     warnungen: list[str] = []
@@ -80,6 +81,8 @@ def _lade_tabelle_als_dataframe(
 
     referenz = _baue_tabellenreferenz(database, schema, tabelle)
     logger.info("Lade Snowflake-Tabelle: name=%s, referenz=%s", name, referenz)
+    if status_callback is not None:
+        status_callback(f"Lese Snowflake-Tabelle {referenz} …")
     try:
         df_roh = session.table(referenz).to_pandas()
     except Exception as exc:
@@ -94,6 +97,8 @@ def _lade_tabelle_als_dataframe(
         ) from exc
 
     logger.info("Snowflake-Tabelle geladen: name=%s, zeilen=%d, spalten=%d", name, len(df_roh), len(df_roh.columns))
+    if status_callback is not None:
+        status_callback(f"Validiere {name}: {len(df_roh):,} Zeilen …")
     df, validierungs_warnungen = validiere_dataframe(df_roh, name)
     warnungen.extend(validierungs_warnungen)
     return df, warnungen
@@ -107,6 +112,7 @@ def lade_snowflake_schema(
     ao_tabelle: str = "AUSSCHEIDEORDNUNG",
     mittelquellen_tabelle: str | None = "MITTELQUELLEN_CONFIG",
     session: Any | None = None,
+    status_callback: Callable[[str], None] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame | None, list[str]]:
     """Laedt Bestand, Tarife, Ausscheideordnung und optionale Mittelquellen aus einem Snowflake-Schema.
 
@@ -118,16 +124,17 @@ def lade_snowflake_schema(
     warnungen: list[str] = []
 
     df_bestand, w_bestand = _lade_tabelle_als_dataframe(
-        session, database, schema, bestand_tabelle, "bestand"
+        session, database, schema, bestand_tabelle, "bestand", status_callback=status_callback
     )
     df_tarife, w_tarife = _lade_tabelle_als_dataframe(
-        session, database, schema, tarife_tabelle, "tarife"
+        session, database, schema, tarife_tabelle, "tarife", status_callback=status_callback
     )
     df_ao, w_ao = _lade_tabelle_als_dataframe(
-        session, database, schema, ao_tabelle, "ao"
+        session, database, schema, ao_tabelle, "ao", status_callback=status_callback
     )
     df_mittel, w_mittel = _lade_tabelle_als_dataframe(
-        session, database, schema, mittelquellen_tabelle or "", "mittelquellen", optional=True
+        session, database, schema, mittelquellen_tabelle or "", "mittelquellen", optional=True,
+        status_callback=status_callback
     )
 
     warnungen.extend(w_bestand)
@@ -136,6 +143,8 @@ def lade_snowflake_schema(
     warnungen.extend(w_mittel)
 
     if df_mittel is not None:
+        if status_callback is not None:
+            status_callback("Validiere Mittelquellen-Konfiguration gegen den Bestand …")
         warnungen.extend(validiere_mittelquellen_config(df_mittel, df_bestand))
 
     return df_bestand, df_tarife, df_ao, df_mittel, warnungen

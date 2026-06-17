@@ -11,6 +11,7 @@ Nutzung:
 """
 
 import logging
+import traceback
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -107,6 +108,19 @@ def _farb_map_dynamisch(df, spalte):
     # Weist jeder eindeutigen Ausprägung in `spalte` eine Farbe aus PALETTE_GROSS zu
     return farb_map_dynamisch_service(df, spalte, PALETTE_GROSS)
 
+def zeige_app_fehler(kontext: str, exc: Exception) -> None:
+    """Zeigt fachliche Fehlermeldung und technischen Traceback direkt in der App."""
+    logger.exception("%s: %s", kontext, exc)
+    st.error(f"{kontext}: {exc}")
+    with st.expander("Technische Details anzeigen"):
+        details = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        st.code(details, language="python")
+
+def aktualisiere_import_status(status_bar, schritt: int, gesamt: int, meldung: str) -> None:
+    """Aktualisiert die Import-Statusleiste in der Sidebar."""
+    fortschritt = int(min(max(schritt / max(gesamt, 1), 0.0), 1.0) * 100)
+    status_bar.progress(fortschritt, text=f"{schritt}/{gesamt} · {meldung}")
+
 # ── Gecachte Wrapper: Ergebnisse werden bei gleichem Input wiederverwendet ──
 
 @st.cache_data(show_spinner="Lade Daten …")
@@ -115,12 +129,14 @@ def lade_csv(datei, name: str):
     try:
         df, warnungen = lade_csv_service(datei, name)
         return df, warnungen
-    except ValueError as exc:
-        st.error(str(exc))
+    except Exception as exc:
+        zeige_app_fehler(f"Fehler beim Laden der Datei '{name}'", exc)
         st.stop()
 
-@st.cache_data(show_spinner="Lade Daten aus Snowflake …", ttl=600)
-def lade_snowflake_schema(database, schema, bestand_tabelle, tarife_tabelle, ao_tabelle, mittelquellen_tabelle):
+def lade_snowflake_schema(
+    database, schema, bestand_tabelle, tarife_tabelle, ao_tabelle, mittelquellen_tabelle,
+    status_callback=None,
+):
     # Laedt Tabellen aus einem Snowflake-Schema und validiert den bestehenden Datenvertrag
     try:
         return lade_snowflake_schema_service(
@@ -130,9 +146,10 @@ def lade_snowflake_schema(database, schema, bestand_tabelle, tarife_tabelle, ao_
             tarife_tabelle=tarife_tabelle,
             ao_tabelle=ao_tabelle,
             mittelquellen_tabelle=mittelquellen_tabelle,
+            status_callback=status_callback,
         )
-    except ValueError as exc:
-        st.error(str(exc))
+    except Exception as exc:
+        zeige_app_fehler("Fehler beim Laden aus Snowflake", exc)
         st.stop()
 
 def speichere_geladene_daten(df_b, df_t, df_a, df_m):
@@ -190,25 +207,31 @@ with st.sidebar:
     if upload_modus == "Mock-Daten (lokaler Pfad)":
         pfad = st.text_input("Verzeichnis", value="./output_daten")
         if st.button("Daten laden", type="primary", use_container_width=True):
+            status_bar = st.progress(0, text="Starte lokalen Datenimport …")
             try:
                 # Alle drei Datendateien einlesen
+                aktualisiere_import_status(status_bar, 1, 5, "Lese bestand.csv …")
                 df_b, w_b = lade_csv(f"{pfad}/bestand.csv", "bestand")
+                aktualisiere_import_status(status_bar, 2, 5, "Lese tarife.csv …")
                 df_t, w_t = lade_csv(f"{pfad}/tarife.csv", "tarife")
+                aktualisiere_import_status(status_bar, 3, 5, "Lese ausscheideordnung.csv …")
                 df_a, w_a = lade_csv(f"{pfad}/ausscheideordnung.csv", "ao")
+                aktualisiere_import_status(status_bar, 4, 5, "Lese optionale mittelquellen_config.csv …")
                 try:
                     df_m, w_m = lade_csv(f"{pfad}/mittelquellen_config.csv", "mittelquellen")
                 except FileNotFoundError:
                     df_m, w_m = None, []
                 speichere_geladene_daten(df_b, df_t, df_a, df_m)
+                aktualisiere_import_status(status_bar, 5, 5, "Import abgeschlossen")
                 st.success(f"✓ {len(df_b):,} Versicherte geladen")
                 alle_warnungen = w_b + w_t + w_a + w_m
                 for w in alle_warnungen:
                     st.warning(f"⚠️ {w}")
                 logger.info("Daten geladen: %d Versicherte, %d Warnungen", len(df_b), len(alle_warnungen))
             except FileNotFoundError as e:
-                st.error(f"Datei nicht gefunden: {e}")
+                zeige_app_fehler("Datei nicht gefunden", e)
             except Exception as e:
-                st.error(f"Fehler: {e}")
+                zeige_app_fehler("Fehler beim Laden der lokalen Mock-Daten", e)
     elif upload_modus == "CSV-Upload":
         # Upload-Widgets für alle drei Pflichtdateien
         f_b = st.file_uploader("bestand.csv", type="csv", key="up_b")
@@ -216,31 +239,40 @@ with st.sidebar:
         f_a = st.file_uploader("ausscheideordnung.csv", type="csv", key="up_a")
         f_m = st.file_uploader("mittelquellen_config.csv (optional)", type="csv", key="up_m")
         if f_b and f_t and f_a:  # Erst laden wenn alle drei Dateien vorhanden sind
-            upload_signature = tuple(
-                (getattr(f, "name", None), getattr(f, "size", None))
-                for f in [f_b, f_t, f_a, f_m]
-            )
-            daten_geaendert = st.session_state.get("_upload_data_signature") != upload_signature
-            df_b, w_b = lade_csv(f_b, "bestand")
-            df_t, w_t = lade_csv(f_t, "tarife")
-            df_a, w_a = lade_csv(f_a, "ao")
-            if f_m:
-                df_m, w_m = lade_csv(f_m, "mittelquellen")
-            else:
-                df_m, w_m = None, []
-            if daten_geaendert:
-                speichere_geladene_daten(df_b, df_t, df_a, df_m)
-                st.session_state["_upload_data_signature"] = upload_signature
-            else:
-                st.session_state["df_bestand"] = df_b
-                st.session_state["df_tarife"] = df_t
-                st.session_state["df_ao"] = df_a
-                st.session_state["df_mittelquellen_config_geladen"] = df_m
-            st.success(f"✓ {len(df_b):,} Versicherte geladen")
-            alle_warnungen = w_b + w_t + w_a + w_m
-            for w in alle_warnungen:
-                st.warning(f"⚠️ {w}")
-            logger.info("Daten geladen (Upload): %d Versicherte, %d Warnungen", len(df_b), len(alle_warnungen))
+            status_bar = st.progress(0, text="Starte CSV-Upload-Import …")
+            try:
+                upload_signature = tuple(
+                    (getattr(f, "name", None), getattr(f, "size", None))
+                    for f in [f_b, f_t, f_a, f_m]
+                )
+                daten_geaendert = st.session_state.get("_upload_data_signature") != upload_signature
+                aktualisiere_import_status(status_bar, 1, 5, "Lese hochgeladene bestand.csv …")
+                df_b, w_b = lade_csv(f_b, "bestand")
+                aktualisiere_import_status(status_bar, 2, 5, "Lese hochgeladene tarife.csv …")
+                df_t, w_t = lade_csv(f_t, "tarife")
+                aktualisiere_import_status(status_bar, 3, 5, "Lese hochgeladene ausscheideordnung.csv …")
+                df_a, w_a = lade_csv(f_a, "ao")
+                aktualisiere_import_status(status_bar, 4, 5, "Lese optionale mittelquellen_config.csv …")
+                if f_m:
+                    df_m, w_m = lade_csv(f_m, "mittelquellen")
+                else:
+                    df_m, w_m = None, []
+                if daten_geaendert:
+                    speichere_geladene_daten(df_b, df_t, df_a, df_m)
+                    st.session_state["_upload_data_signature"] = upload_signature
+                else:
+                    st.session_state["df_bestand"] = df_b
+                    st.session_state["df_tarife"] = df_t
+                    st.session_state["df_ao"] = df_a
+                    st.session_state["df_mittelquellen_config_geladen"] = df_m
+                aktualisiere_import_status(status_bar, 5, 5, "Import abgeschlossen")
+                st.success(f"✓ {len(df_b):,} Versicherte geladen")
+                alle_warnungen = w_b + w_t + w_a + w_m
+                for w in alle_warnungen:
+                    st.warning(f"⚠️ {w}")
+                logger.info("Daten geladen (Upload): %d Versicherte, %d Warnungen", len(df_b), len(alle_warnungen))
+            except Exception as e:
+                zeige_app_fehler("Fehler beim CSV-Upload", e)
     else:
         st.caption(
             "Lädt Tabellen über die aktive Snowflake-Session. "
@@ -253,19 +285,31 @@ with st.sidebar:
         sf_ao = st.text_input("Tabelle Ausscheideordnung", value="AUSSCHEIDEORDNUNG")
         sf_mittel = st.text_input("Tabelle Mittelquellen (optional)", value="MITTELQUELLEN_CONFIG")
         if st.button("Daten aus Snowflake laden", type="primary", use_container_width=True):
-            df_b, df_t, df_a, df_m, alle_warnungen = lade_snowflake_schema(
-                sf_database.strip() or None,
-                sf_schema.strip(),
-                sf_bestand.strip(),
-                sf_tarife.strip(),
-                sf_ao.strip(),
-                sf_mittel.strip(),
-            )
-            speichere_geladene_daten(df_b, df_t, df_a, df_m)
-            st.success(f"✓ {len(df_b):,} Versicherte aus Snowflake geladen")
-            for w in alle_warnungen:
-                st.warning(f"⚠️ {w}")
-            logger.info("Daten geladen (Snowflake): %d Versicherte, %d Warnungen", len(df_b), len(alle_warnungen))
+            status_bar = st.progress(0, text="Starte Snowflake-Import …")
+            status_schritt = {"wert": 0}
+
+            def _snowflake_status(meldung: str) -> None:
+                status_schritt["wert"] = min(status_schritt["wert"] + 1, 10)
+                aktualisiere_import_status(status_bar, status_schritt["wert"], 10, meldung)
+
+            try:
+                df_b, df_t, df_a, df_m, alle_warnungen = lade_snowflake_schema(
+                    sf_database.strip() or None,
+                    sf_schema.strip(),
+                    sf_bestand.strip(),
+                    sf_tarife.strip(),
+                    sf_ao.strip(),
+                    sf_mittel.strip(),
+                    status_callback=_snowflake_status,
+                )
+                speichere_geladene_daten(df_b, df_t, df_a, df_m)
+                aktualisiere_import_status(status_bar, 10, 10, "Snowflake-Import abgeschlossen")
+                st.success(f"✓ {len(df_b):,} Versicherte aus Snowflake geladen")
+                for w in alle_warnungen:
+                    st.warning(f"⚠️ {w}")
+                logger.info("Daten geladen (Snowflake): %d Versicherte, %d Warnungen", len(df_b), len(alle_warnungen))
+            except Exception as e:
+                zeige_app_fehler("Fehler beim Snowflake-Import", e)
 
     df_bestand = st.session_state.get("df_bestand")  # Aktuell geladener Gesamtbestand
 
@@ -381,16 +425,19 @@ tab_bestand, tab_mittel, tab_limitierung = st.tabs([
 # =============================================================================
 
 with tab_bestand:
-    bestandsanalyse.render_bestandsanalyse(
-        df_gefiltert,
-        _farb_map_dynamisch,
-        _geschlecht_label,
-        GRUPPIER_DIMENSIONEN,
-        berechne_kpis,
-        berechne_treemap_daten,
-        berechne_interaktive_statistik,
-        berechne_hist_daten,
-    )
+    try:
+        bestandsanalyse.render_bestandsanalyse(
+            df_gefiltert,
+            _farb_map_dynamisch,
+            _geschlecht_label,
+            GRUPPIER_DIMENSIONEN,
+            berechne_kpis,
+            berechne_treemap_daten,
+            berechne_interaktive_statistik,
+            berechne_hist_daten,
+        )
+    except Exception as e:
+        zeige_app_fehler("Fehler in der Bestandsanalyse", e)
 
 
 # =============================================================================
@@ -398,10 +445,13 @@ with tab_bestand:
 # =============================================================================
 
 with tab_mittel:
-    mittelkonfiguration.render_mittelkonfiguration(
-        df_bestand,
-        st.session_state.get("df_mittelquellen_config_geladen"),
-    )
+    try:
+        mittelkonfiguration.render_mittelkonfiguration(
+            df_bestand,
+            st.session_state.get("df_mittelquellen_config_geladen"),
+        )
+    except Exception as e:
+        zeige_app_fehler("Fehler in der Mittelkonfiguration", e)
 
 
 # =============================================================================
@@ -455,20 +505,23 @@ def berechne_pareto_front(df_gitter, budget_eur):
 
 
 with tab_limitierung:
-    limitierung.render_limitierung(
-        df_bestand,
-        df_gefiltert,
-        st.session_state.get("df_ao"),
-        st.session_state.get("df_tarife"),
-        GRUPPIER_DIMENSIONEN,
-        berechne_barwertfaktoren,
-        berechne_barwertfaktoren_befristet,
-        berechne_limitierung,
-        berechne_limitierung_person,
-        berechne_sensitivitaet,
-        formatiere_euro,
-        berechne_gitter,
-        berechne_optimale_budgetstufen,
-        finde_knickpunkt,
-        berechne_pareto_front,
-    )
+    try:
+        limitierung.render_limitierung(
+            df_bestand,
+            df_gefiltert,
+            st.session_state.get("df_ao"),
+            st.session_state.get("df_tarife"),
+            GRUPPIER_DIMENSIONEN,
+            berechne_barwertfaktoren,
+            berechne_barwertfaktoren_befristet,
+            berechne_limitierung,
+            berechne_limitierung_person,
+            berechne_sensitivitaet,
+            formatiere_euro,
+            berechne_gitter,
+            berechne_optimale_budgetstufen,
+            finde_knickpunkt,
+            berechne_pareto_front,
+        )
+    except Exception as e:
+        zeige_app_fehler("Fehler in der Limitierungsrechnung", e)
