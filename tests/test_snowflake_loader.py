@@ -1,6 +1,5 @@
 """Tests fuer services/snowflake_loader.py"""
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -68,7 +67,7 @@ def _mittelquellen_df():
         "AKTIV": [True, True, True],
         "PRIORITAET": ["1", "2", "3"],
         "TYP": ["ZEILENINDIVIDUELL", "ZEILENINDIVIDUELL", "GLOBAL"],
-        "BETRAG_EURO": [np.nan, np.nan, 1_000_000.0],
+        "BETRAG_EURO": ["", "", "100000000"],
         "BETRAG_SPALTE": ["UEBERZINS_MITTEL_EURO", "ZU10_MITTEL_EURO", ""],
         "BETRAG_EINHEIT": ["EINMALEINLAGE", "EINMALEINLAGE", "EINMALEINLAGE"],
         "UNTERLIEGT_LIMITIERUNGSREGELN": [False, True, True],
@@ -107,6 +106,8 @@ def test_lade_snowflake_schema_normalisiert_uppercase_spalten_und_config_referen
     assert df_mittel is not None
     assert df_mittel.loc[0, "betrag_spalte"] == "ueberzins_mittel_euro"
     assert df_mittel.loc[1, "filter_spalten"] == "tarifart|alter"
+    assert pd.isna(df_mittel.loc[0, "betrag_euro"])
+    assert df_mittel.loc[2, "betrag_euro"] == 100_000_000
 
 
 def test_lade_snowflake_schema_optionale_mittelquellen_tabelle_darf_fehlen():

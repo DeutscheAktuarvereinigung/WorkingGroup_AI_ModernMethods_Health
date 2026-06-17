@@ -74,6 +74,15 @@ def _normalisiere_mittelquellen_config(df_config: pd.DataFrame) -> pd.DataFrame:
     for spalte in ["typ", "betrag_einheit", "einsatzmodus", "anwendungsphase"]:
         if spalte in df_config.columns:
             df_config[spalte] = df_config[spalte].astype(str).str.strip().str.lower()
+    if "betrag_euro" in df_config.columns:
+        # Snowflake liefert gemischte/leere Konfigurationsspalten haeufig als VARCHAR.
+        # Leere Werte bleiben fuer zeilenindividuelle Quellen erlaubt; befuellte Werte
+        # muessen vor der fachlichen Validierung echte numerische Werte sein.
+        betrag_euro = df_config["betrag_euro"].replace(r"^\s*$", np.nan, regex=True)
+        try:
+            df_config["betrag_euro"] = pd.to_numeric(betrag_euro, errors="raise")
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Mittelquellen: 'betrag_euro' muss numerisch sein, wenn befüllt.") from exc
     if "betrag_spalte" in df_config.columns:
         df_config["betrag_spalte"] = df_config["betrag_spalte"].apply(_normalisiere_pipe_referenzen)
     if "filter_spalten" in df_config.columns:
