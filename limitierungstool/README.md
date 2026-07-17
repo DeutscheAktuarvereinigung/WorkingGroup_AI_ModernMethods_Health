@@ -2,6 +2,11 @@
 
 Streamlit-Anwendung fuer Bestandsanalyse und Limitierungsrechnung in der PKV.
 
+> Teil des Repositories der DAV-Arbeitsgruppe "Kuenstliche Intelligenz und
+> moderne Methoden in der Krankenversicherung" (siehe [Haupt-README](../README.md)).
+> Alle nachfolgenden Befehle werden aus diesem Ordner heraus ausgefuehrt:
+> vorher `cd limitierungstool`.
+
 Stand: 2026-04-16
 
 ## Ziel und Funktionsumfang
