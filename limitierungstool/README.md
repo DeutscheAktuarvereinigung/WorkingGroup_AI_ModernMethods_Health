@@ -34,6 +34,7 @@ Kernfunktionen:
 - pandas
 - numpy
 - plotly
+- scipy
 
 Abhaengigkeiten siehe requirements.txt.
 
