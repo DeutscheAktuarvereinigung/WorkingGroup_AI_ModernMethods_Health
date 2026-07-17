@@ -1,0 +1,362 @@
+\section{Rechnungsgrundlagen}\label{sec:rechnungsgrundlagen}
+
+Rechnungsgrundlagen im Sinne des \S\,2 Abs.\,1 KVAV sind der
+Rechnungszins, die Ausscheideordnung, die Kopfschäden, der
+Sicherheitszuschlag und die sonstigen Zuschläge. Alle rechnungsmäßigen
+Ansätze werden gemäß \S\,9 KVAV in überprüfbarer Weise belegt; die
+Rechnungsgrundlagen sind gemäß \S\,2 Abs.\,3 KVAV mit ausreichenden
+Sicherheiten versehen. Das Schlussalter aller Tafeln beträgt
+$\omega = 110$.
+
+\subsection{Rechnungszinssatz}\label{sec:zins}
+
+Der Rechnungszins $i$ wird je Beobachtungseinheit festgelegt und
+überschreitet den Höchstrechnungszins von 3{,}5\,\% gemäß \S\,4 KVAV
+nicht. Die Angemessenheit wird jährlich anhand des aktuariellen
+Unternehmenszinses (AUZ) gemäß der DAV-Richtlinie
+\glqq Der aktuarielle Unternehmenszins in der privaten
+Krankenversicherung (AUZ)\grqq{} überprüft; die Herleitung des AUZ ist
+in der Rahmen-TB \mbox{RTB-AUZ} (Version 2025-1) dokumentiert
+(Abschnitt~\ref{sec:rahmentb}). Der AUZ des Unternehmens zum
+Kalkulationsstichtag wird zusammen mit den rechnungsmäßigen Zinssätzen
+in Anlage~\ref{sec:anlage21} ausgewiesen; die Zinssätze
+liegen jeweils unterhalb des AUZ und sind damit vorsichtig gewählt. Es gilt der Diskontierungsfaktor
+\begin{equation}
+v = \frac{1}{1+i},
+\label{eq:diskont}
+\end{equation}
+wobei $i$ den Rechnungszins der jeweiligen Beobachtungseinheit
+bezeichnet. Eine unterjährige Verzinsung wird nicht angesetzt.
+
+\subsection{Ausscheideordnung}\label{sec:ausscheideordnung}
+
+Die Ausscheideordnung wird gemäß \S\,5 KVAV aus Sterbe- und
+Stornowahrscheinlichkeiten zusammengesetzt; beide werden gesondert
+nachgewiesen.
+
+\subsubsection{Sterbewahrscheinlichkeiten}\label{sec:sterblichkeit}
+
+Als rechnungsmäßige Sterbewahrscheinlichkeiten $q_x$ werden die Werte
+der jeweils aktuellsten von der BaFin veröffentlichten
+\textbf{PKV-Sterbetafel} verwendet, derzeit der PKV-Sterbetafel~2025
+(Spalten $q_x$ für Männer und $q_y$ für Frauen, Alter 0 bis 102), ohne
+Zu- oder Abschläge. Eine Prüfung ergab keine Anhaltspunkte dafür, dass
+die Tafel für den Bestand des Tarifs ungeeignet ist.
+
+\textbf{Fortschreibung oberhalb des Tafelendalters (Festlegung):} Die
+PKV-Sterbetafel endet beim Alter 102. Für die Alter 103 bis 109 werden
+die Sterbewahrscheinlichkeiten linear interpoliert zwischen $q_{102}$
+und $q_{110} := 1$:
+\begin{equation}
+q_x = q_{102} + \bigl(1 - q_{102}\bigr)\cdot\frac{x-102}{110-102},
+\qquad x = 103,\dots,109,
+\label{eq:qfort}
+\end{equation}
+wobei $q_{102}$ den letzten Tafelwert bezeichnet. Im Schlussalter
+$\omega = 110$ scheiden alle Versicherten rechnungsmäßig aus.
+
+\subsubsection{Stornowahrscheinlichkeiten}\label{sec:storno}
+
+Die rechnungsmäßigen Stornowahrscheinlichkeiten $w_x$ beruhen auf der
+unternehmenseigenen Stornobeobachtung der Krankheitskostenvollversicherung
+der Geschäftsjahre 2021 bis 2023 (Personenzählung unter Elimination von
+zwei Beginnjahren zur Ausschaltung des Frühstornos; Methodik gemäß der
+DAV-Richtlinie \glqq Festlegung von Stornotafeln in der privaten
+Krankenversicherung\grqq). Die Werte werden geschlechtsunabhängig
+angesetzt, da die Beobachtung keine signifikanten Unterschiede zwischen
+Männern und Frauen ergab. Gegenüber den bisher angesetzten Werten
+(Änderungsnr.~16) wurden die Stornowahrscheinlichkeiten in den Altern
+21 bis 35 um durchschnittlich 0{,}5 Prozentpunkte gesenkt. Im
+Schlussalter gilt $w_{110} := 0$, zusammen mit $q_{110} = 1$ also
+$(q+w)_{110} = 1$.
+
+\subsubsection{Zusammengesetzte Ausscheideordnung}\label{sec:zao}
+
+Die Ausscheidewahrscheinlichkeit ist
+\begin{equation}
+(q+w)_x = q_x + w_x,
+\label{eq:qw}
+\end{equation}
+wobei $q_x$ die Sterbe- und $w_x$ die Stornowahrscheinlichkeit des
+Alters $x$ bezeichnet. Die \textbf{diskontierte
+Übergangswahrscheinlichkeit} ist
+\begin{equation}
+DQ_x = v\cdot\bigl(1-(q+w)_x\bigr),
+\label{eq:dq}
+\end{equation}
+wobei $v$ der Diskontierungsfaktor gemäß Gleichung~\eqref{eq:diskont}
+ist. Zur Veranschaulichung ergibt sich hieraus die Bestandsfunktion
+$l_{x+1} = \bigl(1-(q+w)_x\bigr)\cdot l_x$ mit dem Startwert
+$l_{21} = 1\,000\,000$ sowie die diskontierten Lebenden
+$D_x = v^x\cdot l_x$ mit $DQ_x = D_{x+1}/D_x$; für die Berechnungen
+dieser TB werden ausschließlich die Rekursionen des
+Abschnitts~\ref{sec:grundwerte} verwendet. Die vollständigen Tafeln
+$q_x$, $w_x$, $(q+w)_x$ und $DQ_x$ enthält Anlage~\ref{sec:anlage221}.
+
+\subsection{Kopfschaden}\label{sec:kopfschaden}
+
+Die folgenden Unterabschnitte dokumentieren die Grundsätze der
+Kopfschadenermittlung, die Umlage der Schwangerschafts- und
+Mutterschaftskosten, die Herleitung der rechnungsmäßigen Profile und
+Grundkopfschäden sowie die Kopfschäden der Kinder und Jugendlichen.
+
+\subsubsection{Grundsätze}\label{sec:kopfschaden-grundsaetze}
+
+Die Kalkulation erfolgt mit Profilen und Grundkopfschäden nach der
+Methode von Rusam: Der rechnungsmäßige Kopfschaden des Alters $x$ ist
+\begin{equation}
+K_x = k_x \cdot G,
+\label{eq:rusam}
+\end{equation}
+wobei $k_x$ den normierten Kopfschaden (Profilwert) des Alters $x$ und
+$G$ den Grundkopfschaden der Beobachtungseinheit bezeichnet. Das
+Normierungsalter ist 40, d.\,h. $k_{40} = 1$ und $G = K_{40}$.
+
+Da der eigene Bestand des Tarifs für eine tarifindividuelle Herleitung
+nicht ausreichend groß ist (\S\,6 Abs.\,3 KVAV), werden als Stützdaten
+die von der BaFin veröffentlichten Kopfschadentafeln
+(\textbf{PKV-Kopfschadenstatistik, Beobachtungsjahr 2022}) verwendet.
+Das Leistungsversprechen des Tarifs entspricht in Leistungsumfang und
+Selbstbehaltsstufe den folgenden Tafeln für Nichtbeihilfeberechtigte
+(Versicherungsart~N):
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Leistungsbereich & BaFin-Tafel (Männer/Frauen/S-Kosten) & Bemerkung \\
+\midrule
+ambulant & 01\_KKV\_amb\_N\_\{M,W,S\}\_0-100 & Selbstbehalt 0--100 EUR \\
+stationär & 02\_KKV\_stat\_N\_\{M,W,S\}\_MB & Mehrbettzimmer \\
+Zahnbehandlung & 03\_KKV\_zahn\_N\_\{M,W,S\}\_Beh & \\
+Zahnersatz & 03\_KKV\_zahn\_N\_\{M,W,S\}\_Ers\_70-80 & Erstattung 70--80\,\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection{Umlage der Schwangerschafts- und Mutterschaftskosten}
+\label{sec:sumlage}
+
+Die Tafeln der Frauen enthalten die Schwangerschafts- und
+Mutterschaftskosten (S-Kosten). Diese werden seit 2009 (AGG)
+geschlechtsunabhängig umgelegt. Je Leistungsbereich und Alter $x$ wird
+die Umlage
+\begin{equation}
+u_x = \frac{n^{W}_x \cdot K^{S}_x}{n^{M}_x + n^{W}_x}
+\label{eq:sumlage}
+\end{equation}
+gebildet, wobei $K^{S}_x$ die beobachteten S-Kosten je versicherte Frau
+(Tafeln mit Kennung~S), $n^{M}_x$ und $n^{W}_x$ die Bestände
+(Personenjahre) der Männer- bzw. Frauentafel des Leistungsbereichs
+bezeichnen. Die beobachteten Teilkopfschäden nach Umlage sind
+\begin{equation}
+K^{\mathrm{LB},M}_x = K^{\mathrm{LB}}_x(\text{M}) + u_x,
+\qquad
+K^{\mathrm{LB},W}_x = K^{\mathrm{LB}}_x(\text{W}) - K^{S}_x + u_x,
+\label{eq:teilkopf}
+\end{equation}
+wobei $K^{\mathrm{LB}}_x(\cdot)$ den Kopfschaden der jeweiligen
+BaFin-Tafel bezeichnet. In Altern ohne S-Kosten (keine
+Tafelwerte) ist $K^S_x = 0$.
+
+\subsubsection{Herleitung der rechnungsmäßigen Profile und
+Grundkopfschäden}\label{sec:kopfschaden-herleitung}
+
+Der beobachtete Gesamtkopfschaden je Geschlecht ist die Summe der
+Teilkopfschäden über die vier Leistungsbereiche:
+\begin{equation}
+K^{\mathrm{beob}}_x
+= K^{\mathrm{amb}}_x + K^{\mathrm{stat}}_x + K^{\mathrm{zahnB}}_x
++ K^{\mathrm{zahnE}}_x ,
+\qquad x = 0,\dots,100.
+\label{eq:ksumme}
+\end{equation}
+Die vollständige Herleitung je Alter enthält Anlage~\ref{sec:anlage232}.
+
+\textbf{Fortschreibung oberhalb des Tafelendalters (Festlegung):} Die
+BaFin-Tafeln enden beim Alter 100. Für die Alter 101 bis 110 wird der
+Gesamtkopfschaden geometrisch fortgeschrieben:
+\begin{equation}
+K^{\mathrm{beob}}_x = K^{\mathrm{beob}}_{100}\cdot g^{\,x-100},
+\qquad
+g = \Bigl(K^{\mathrm{beob}}_{100} / K^{\mathrm{beob}}_{95}\Bigr)^{1/5},
+\qquad x = 101,\dots,110,
+\label{eq:kfort}
+\end{equation}
+wobei $g$ die mittlere jährliche Veränderungsrate der Alter 95 bis 100
+bezeichnet; die festgesetzten Veränderungsraten je Beobachtungseinheit
+werden in Anlage~\ref{sec:anlage232} ausgewiesen.
+
+Die Profilwerte ergeben sich durch Normierung auf das Alter 40,
+\begin{equation}
+k_x = \frac{K^{\mathrm{beob}}_x}{K^{\mathrm{beob}}_{40}},
+\label{eq:profil}
+\end{equation}
+und werden auf vier Nachkommastellen gerundet.
+\textbf{Monotonisierung (Festlegung):} Ab dem Monotonisierungsalter
+$\tilde{x}$ werden die Profilwerte monoton nicht fallend angesetzt,
+\begin{equation}
+k_x := \max\{k_{x-1},\, k_x\}, \qquad x = \tilde{x}+1,\dots,110,
+\label{eq:mono}
+\end{equation}
+da die beobachteten Profile in den schwach besetzten hohen Altern
+fallen; der festgesetzte Wert $\tilde{x}$ wird in
+Anlage~\ref{sec:anlage233} ausgewiesen. Die Monotonisierung wirkt als
+Sicherheitsmarge und stellt
+zusammen mit der Beitragsformel des Abschnitts~\ref{sec:beitragsraten}
+monoton nicht fallende Beiträge sicher (\S\,146 Abs.\,2 VAG).
+
+Der \textbf{rechnungsmäßige Grundkopfschaden} wird je
+Beobachtungseinheit als $G = K^{\mathrm{beob}}_{40}$ festgesetzt:
+Die festgesetzten Werte $G^{M}$ und $G^{F}$, die rechnungsmäßigen
+Profile $k_x$ und die rechnungsmäßigen Kopfschäden $K_x = k_x\cdot G$
+werden -- da sie sich mit jeder Beitragsanpassung ändern können --
+in Anlage~\ref{sec:anlage233} ausgewiesen; dort ist auch
+der Nachweis der ausreichenden Sicherheit der Grundkopfschäden
+dokumentiert.
+
+\subsubsection{Kopfschäden der Kinder und Jugendlichen}
+\label{sec:kopfschaden-kinder}
+
+Für die Beobachtungseinheit der Kinder (0--15) wird ein
+altersunabhängiger, geschlechtsunabhängiger mittlerer Kopfschaden
+angesetzt; für die Jugendlichen (16--20) werden altersunabhängige,
+nach Geschlecht getrennte mittlere Kopfschäden der männlichen und der
+weiblichen Jugendlichen angesetzt (jeweils bestandsgewichtetes Mittel
+der Gesamtkopfschäden nach S-Umlage über die Altersgruppe, Gewichte:
+Bestände der Ambulanttafeln). Die festgesetzten Werte
+$\bar{K}_{\mathrm{Ki}}$, $\bar{K}^{M}_{\mathrm{Ju}}$ und
+$\bar{K}^{F}_{\mathrm{Ju}}$ werden in Anlage~\ref{sec:anlage233}
+ausgewiesen.
+
+\subsection{Zuschläge}\label{sec:zuschlaege}
+
+Die Zuschläge umfassen den Sicherheitszuschlag, die Kostenzuschläge,
+den Zuschlag für die erfolgsunabhängige Beitragsrückerstattung, den
+Zuschlag für Standard- und Basistarif sowie die Zillmerung.
+
+\subsubsection{Sicherheitszuschlag}\label{sec:sicherheitszuschlag}
+
+Der Sicherheitszuschlag $\sigma$ gemäß \S\,7 KVAV wird einheitlich
+für alle Beobachtungseinheiten und Alter als Prozentsatz des
+Bruttobeitrags angesetzt und beträgt mindestens den gesetzlichen
+Mindestsatz von 5~Prozent; der festgesetzte Wert wird in
+Anlage~\ref{sec:anlage241} ausgewiesen. Er ist
+nicht bereits in anderen Rechnungsgrundlagen enthalten.
+\textbf{Begründung der Höhe:} Der gesetzliche Mindestsatz wird als
+ausreichend angesehen, da die übrigen Rechnungsgrundlagen bereits
+eigene Sicherheiten enthalten (vorsichtiger Rechnungszins unterhalb
+des AUZ, Sicherheitsmarge der Grundkopfschäden gemäß
+Abschnitt~\ref{sec:kopfschaden-herleitung}, Monotonisierung der
+Profile, Sterbetafel ohne Abschläge). Rundungen der
+Beitragsberechnung gehen zu Gunsten oder zu Lasten des
+Sicherheitszuschlags (Abschnitt~\ref{sec:rundung}).
+
+\subsubsection{Kostenzuschläge}\label{sec:kosten}
+
+Die Kostensätze werden in der Kostenrechnung des Unternehmens je
+Beobachtungseinheit hergeleitet (Rahmen-TB \mbox{RTB-Kosten}) und als
+Prozentsätze des Bruttobeitrags angesetzt. Die einzelnen Kostenarten
+(\S\,8 Abs.\,1 KVAV) -- unmittelbare Abschlusskosten (laufender Zuschlag
+$\alpha_u$), mittelbare Abschlusskosten $\alpha_m$,
+Schadenregulierungskosten $\rho$ und sonstige Verwaltungskosten $\beta$
+-- und ihre Summen $\Delta_x$ werden zusammen mit der einbezogenen
+Version der Rahmen-TB in Anlage~\ref{sec:anlage241} ausgewiesen, da sie
+sich mit jeder Beitragsanpassung ändern können.
+
+Der laufende Zuschlag für unmittelbare Abschlusskosten entfällt nach
+Vollendung des 65.~Lebensjahres (\S\,8 Abs.\,3 Satz~3 KVAV).
+Gemäß \S\,8 Abs.\,4 KVAV dürfen in die Prämien -- mit Ausnahme der
+Zillmerung und der Zuschläge nach \S\,8 Abs.\,1 Nr.\,6 und 8 KVAV --
+nur altersunabhängige absolute Kostenzuschläge eingerechnet werden.
+Die prozentualen Kostensätze werden daher in altersunabhängige
+Zuschläge $\gamma$ (EUR p.\,a.) umgerechnet. Die Umrechnung erfolgt
+über das \textbf{Gamma-Alter} $x_\gamma$, das auf ganze Jahre
+gerundete bestandsgewichtete Durchschnittsalter der
+Beobachtungseinheit in der Krankheitskostenvollversicherung des
+Unternehmens zum 31.12.2023 (Bestandsstatistik; fiktive Festlegung:
+Männer $x_\gamma = \GammaAlterM$, Frauen $x_\gamma = \GammaAlterF$):
+\begin{equation}
+\gamma^{\mathrm{Kosten}}_{\le 64}
+= \frac{12\,\Delta_{\le 64}\cdot\bigl(G\cdot A_{x_\gamma}
+  + \gamma^{\mathrm{euBR}}\cdot a_{x_\gamma}\bigr)}
+       {12\,\bigl(1-\Delta_{\le 64}-\sigma-\Omega_{\le 64}\bigr)\cdot
+        a_{x_\gamma} - \alpha_{x_\gamma}},
+\qquad
+\gamma^{\mathrm{Kosten}}_{\ge 65}
+= \gamma^{\mathrm{Kosten}}_{\le 64}\cdot
+  \frac{\Delta_{\ge 65}}{\Delta_{\le 64}},
+\label{eq:gammakosten}
+\end{equation}
+wobei $A_{x_\gamma}$ und $a_{x_\gamma}$ die Barwerte des Gamma-Alters
+gemäß Abschnitt~\ref{sec:grundwerte}, $\sigma$ den Sicherheitszuschlag
+gemäß Abschnitt~\ref{sec:sicherheitszuschlag},
+$\Omega$ den Zuschlag gemäß Abschnitt~\ref{sec:omega} und
+$\alpha_{x_\gamma}$ den Zillmersatz gemäß
+Abschnitt~\ref{sec:zillmerung} bezeichnen. Der Ausdruck
+$12\,\Delta\cdot b_{x_\gamma}$ entspricht dem jährlichen prozentualen
+Kostenbetrag der Musterperson des Gamma-Alters.
+
+\subsubsection{Zuschlag für die erfolgsunabhängige
+Beitragsrückerstattung}\label{sec:eubr}
+
+Der Zuschlag für die erfolgsunabhängige Beitragsrückerstattung
+(\S\,8 Abs.\,1 Nr.\,5 KVAV) wird als absoluter Zuschlag angesetzt
+(Festlegung auf Basis der Auszahlungsquoten der Geschäftsjahre
+2021--2023). Die festgesetzten Werte $\gamma^{\mathrm{euBR}}$ je
+Beobachtungseinheit werden in Anlage~\ref{sec:anlage241}
+ausgewiesen.
+
+\subsubsection{Zuschlag für Standardtarif und Basistarif}
+\label{sec:omega}
+
+Der beitragsproportionale Zuschlag zur Umlage der Begrenzung der
+Beitragshöhe im Basistarif (\S\,154 VAG, \S\,8 Abs.\,1 Nr.\,6 KVAV)
+und für den Standardtarif (\S\,8 Abs.\,1 Nr.\,8 KVAV) beträgt
+\begin{equation}
+\Omega_x = \begin{cases}
+\OmegaU\,\% & x \le 64,\\[2pt]
+\OmegaO\,\% & x \ge 65,
+\end{cases}
+\label{eq:omegaz}
+\end{equation}
+da die Standardtarif-Komponente nach Vollendung des 65.~Lebensjahres
+entfällt (\S\,8 Abs.\,5 KVAV). \textbf{Zusammensetzung:} Die
+Basistarif-Komponente (0{,}6\,\%, branchenweit einheitlich vom
+PKV-Verband ermittelt) und die Standardtarif-Komponente (0{,}1\,\%,
+$x \le 64$) sind poolbedingt; ihre Herleitung ist in den Technischen
+Berechnungsgrundlagen des Basistarifs bzw. Standardtarifs des
+Unternehmens dokumentiert. Ein unternehmensindividueller Anteil wird
+nicht erhoben (Festlegung).
+
+\subsubsection{Summe der Zuschläge}\label{sec:zuschlagsumme}
+
+Die altersunabhängigen Zuschläge je Beobachtungseinheit ergeben sich
+als Summe
+\begin{equation}
+\gamma_x = \gamma^{\mathrm{euBR}} + \gamma^{\mathrm{Kosten}}_x;
+\label{eq:gammasumme}
+\end{equation}
+die festgesetzten Werte (einschließlich der Kinder und Jugendlichen)
+sowie die Summe der beitragsproportionalen Zuschläge
+$\sigma + \Omega_x$ werden in Anlage~\ref{sec:anlage241}
+ausgewiesen. Eine Übersicht aller Zuschläge enthält Anlage~\ref{sec:anlage241}.
+
+\subsubsection{Zillmerung}\label{sec:zillmerung}
+
+Zur nachgelagerten Finanzierung der unmittelbaren Abschlusskosten wird
+gezillmert. Der Zillmersatz $\alpha_x$ in Vielfachen des
+Monatsbeitrags beträgt
+\begin{equation}
+\alpha_x = \begin{cases}
+0 & x \le 20,\\
+\AlphaZ & 21 \le x \le 75,\\
+3{,}5 - 0{,}7\cdot(x-75) & 76 \le x \le 79,\\
+0 & x \ge 80.
+\end{cases}
+\label{eq:zillmer}
+\end{equation}
+Die Zillmerkosten eines Vertrags betragen $\alpha_{x_e}\cdot b_{x_e}$
+(einmalig bei Vertragsbeginn), wobei $x_e$ das Eintrittsalter und
+$b_{x_e}$ den Monatsbeitrag bezeichnet. Der Nachweis der zulässigen
+Höhe des Zillmersatzes gemäß \S\,8 Abs.\,3 KVAV wird in
+Abschnitt~\ref{sec:bilanzar} und Anlage~\ref{sec:anlage522} geführt.

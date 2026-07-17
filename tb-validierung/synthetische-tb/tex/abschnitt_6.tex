@@ -1,0 +1,141 @@
+\section{Ermittlung der auslösenden Faktoren}\label{sec:af}
+
+Dieser Abschnitt dokumentiert das Verfahren zur jährlichen Ermittlung
+der auslösenden Faktoren der Leistungen und der Sterblichkeit je
+Beobachtungseinheit. In diesem Abschnitt werden keine Anlagen geführt.
+
+\subsection{Allgemeines}\label{sec:af-allgemein}
+
+Rechtsgrundlage für Beitragsanpassungen sind \S\,203 Abs.\,2 VVG
+i.\,V.\,m. \S\,8b der AVB sowie \S\,155 VAG. Das Unternehmen vergleicht
+jährlich je Beobachtungseinheit die erforderlichen mit den kalkulierten
+Versicherungsleistungen (\S\,155 Abs.\,3 VAG, \S\,15 KVAV) sowie die
+erforderlichen mit den kalkulierten Sterbewahrscheinlichkeiten
+(\S\,155 Abs.\,4 VAG, \S\,16 KVAV). Beobachtungseinheiten für die
+auslösenden Faktoren sind \textbf{Männer}, \textbf{Frauen} sowie
+\textbf{Kinder und Jugendliche zusammengefasst}. Ergibt die
+Gegenüberstellung der Leistungen eine Abweichung von mehr als
+\textbf{5\,\%} (vertraglich in \S\,8b AVB festgelegter Schwellenwert
+unterhalb des gesetzlichen Werts von 10\,\%) oder die
+Gegenüberstellung der Sterbewahrscheinlichkeiten eine Abweichung von
+mehr als \textbf{5\,\%}, werden alle Beiträge der Beobachtungseinheit
+überprüft und, soweit die Abweichung nicht nur vorübergehend ist, mit
+Zustimmung des Treuhänders angepasst. In diesem Abschnitt werden keine
+Anlagen geführt.
+
+\subsection{Tatsächliche Grundkopfschäden}\label{sec:af-gks}
+
+Für jedes der letzten drei Beobachtungsjahre wird der tatsächliche
+Grundkopfschaden gemäß Abschnitt~A der Anlage~2 zur KVAV ermittelt:
+\begin{equation}
+G^{(j)} = \frac{S^{(j)}}{\sum_{x} L^{(j)}_x \cdot k_x},
+\qquad j = 1,2,3,
+\label{eq:af-gks}
+\end{equation}
+wobei $S^{(j)}$ die abgegrenzten Schadenzahlungen der
+Beobachtungseinheit im Beobachtungsjahr $j$ (ohne die auf
+Nettorisikozuschläge entfallenden Leistungen, einschließlich der
+geschlechtsunabhängig verteilten Leistungen für Schwangerschaft und
+Mutterschaft), $L^{(j)}_x$ den abgegrenzten mittleren Bestand des
+Alters $x$ und $k_x$ die rechnungsmäßigen Profilwerte gemäß
+Anlage~\ref{sec:anlage233} bezeichnen. Bei zwischenzeitlichen Leistungsänderungen
+werden die tatsächlichen Grundkopfschäden auf das aktuelle
+Leistungsversprechen umgerechnet (\S\,15 Abs.\,2 KVAV); die
+Umrechnungsfaktoren werden im Anpassungsfall dokumentiert.
+
+\textbf{Verfahrensdetails (Festlegungen):} Die Bestände $L^{(j)}_x$
+werden als mittlere Personenjahre des Beobachtungsjahres ohne
+Elimination von Beginnjahren ermittelt (der Tarif ist für das
+Neugeschäft geschlossen, Wartezeit- und Selektionseffekte sind
+abgeklungen). Die Schäden $S^{(j)}$ werden nach dem Anfalljahrprinzip
+abgegrenzt; der Schaden des jüngsten Beobachtungsjahres wird mit
+Abwicklungsfaktoren aus der unternehmenseigenen
+Abwicklungsstatistik auf den Endstand hochgerechnet. Für die
+zusammengefasste Beobachtungseinheit der Kinder und Jugendlichen liegt
+kein Altersprofil vor (natürliche Prämie); es wird $k_x := 1$ für alle
+$x \le 20$ gesetzt (altersunabhängige Kopfschäden gemäß
+Abschnitt~\ref{sec:kopfschaden-kinder}), sodass sich der tatsächliche
+Grundkopfschaden gemäß Gleichung~\eqref{eq:af-gks} zum
+bestandsgewichteten mittleren Kopfschaden
+$G^{(j)} = S^{(j)} / \sum_x L^{(j)}_x$ vereinfacht. Als rechnungsmäßiger
+Vergleichswert dient der bestandsgewichtete Mittelwert der
+rechnungsmäßigen Kopfschäden
+$G^{\mathrm{rech}} = 0{,}75\cdot\bar{K}_{\mathrm{Ki}}
++ 0{,}25\cdot\bar{K}_{\mathrm{Ju}}$, wobei $\bar{K}_{\mathrm{Ju}}$ das
+bestandsgewichtete Mittel der männlichen und weiblichen Jugendlichen
+bezeichnet.
+
+\subsection{Auslösender Faktor der Leistungen}\label{sec:af-leistung}
+
+Der extrapolierte Grundkopfschaden gemäß Abschnitt~B der Anlage~2 zur
+KVAV (lineare Trendgerade durch die drei Beobachtungswerte,
+ausgewertet 18~Monate nach dem Ende des letzten Beobachtungsjahres)
+beträgt
+\begin{equation}
+G^{\mathrm{ext}} = \frac{3}{2}\cdot\bigl(G^{(3)} - G^{(1)}\bigr)
++ \frac{1}{3}\cdot\bigl(G^{(1)} + G^{(2)} + G^{(3)}\bigr),
+\label{eq:af-ext}
+\end{equation}
+wobei $G^{(1)}, G^{(2)}, G^{(3)}$ die (umgerechneten) tatsächlichen
+Grundkopfschäden in zeitlicher Reihenfolge bezeichnen. Mit dem
+mittleren Bestand $L_x$ des aktuellen Geschäftsjahres ergeben sich die
+erforderlichen und die kalkulierten Versicherungsleistungen
+\begin{equation}
+S^{\mathrm{erf}} = G^{\mathrm{ext}}\cdot\sum_x L_x\,k_x,
+\qquad
+S^{\mathrm{kalk}} = G^{\mathrm{rech}}\cdot\sum_x L_x\,k_x,
+\label
+{eq:af-serf}
+\end{equation}
+wobei $G^{\mathrm{rech}}$ den rechnungsmäßigen Grundkopfschaden gemäß
+Gleichung~\eqref{eq:gks} bezeichnet. Der auslösende Faktor der
+Leistungen ist
+\begin{equation}
+AF^{L} = \frac{S^{\mathrm{erf}}}{S^{\mathrm{kalk}}}
+       = \frac{G^{\mathrm{ext}}}{G^{\mathrm{rech}}};
+\label{eq:af-l}
+\end{equation}
+eine Überprüfungspflicht besteht, falls
+$\bigl|1 - AF^{L}\bigr| > 0{,}05$.
+
+\subsection{Auslösender Faktor der Sterblichkeit}\label{sec:af-sterb}
+
+Gemäß \S\,16 KVAV werden die Leistungsbarwerte \textbf{ohne
+Berücksichtigung der Stornowahrscheinlichkeiten} mit dem
+rechnungsmäßigen Zins und den rechnungsmäßigen Kopfschäden verglichen:
+\begin{equation}
+A^{\mathrm{kalk}}_x = \sum_{t=0}^{110-x} v^t\, K_{x+t}
+\prod_{s=0}^{t-1}\bigl(1-q_{x+s}\bigr),
+\qquad
+A^{\mathrm{erf}}_x = \sum_{t=0}^{110-x} v^t\, K_{x+t}
+\prod_{s=0}^{t-1}\bigl(1-q^{\mathrm{BaFin}}_{x+s}\bigr),
+\label{eq:af-barwerte}
+\end{equation}
+wobei $q_{x}$ die rechnungsmäßigen Sterbewahrscheinlichkeiten gemäß
+Abschnitt~\ref{sec:sterblichkeit} und $q^{\mathrm{BaFin}}_{x}$ die
+Werte der zuletzt von der BaFin veröffentlichten PKV-Sterbetafel
+bezeichnen. Der auslösende Faktor der Sterblichkeit ist das Maximum
+der über drei Altersbänder gemittelten Barwertquotienten:
+\begin{equation}
+AF^{S} = \max\left\{
+\frac{1}{25}\sum_{x=21}^{45}\frac{A^{\mathrm{erf}}_x}{A^{\mathrm{kalk}}_x};\;
+\frac{1}{25}\sum_{x=46}^{70}\frac{A^{\mathrm{erf}}_x}{A^{\mathrm{kalk}}_x};\;
+\frac{1}{25}\sum_{x=71}^{95}\frac{A^{\mathrm{erf}}_x}{A^{\mathrm{kalk}}_x}
+\right\};
+\label{eq:af-s}
+\end{equation}
+eine Überprüfungspflicht besteht, falls
+$\bigl|1 - AF^{S}\bigr| > 0{,}05$ (\S\,155 Abs.\,4 VAG).
+
+\subsection{Fristen und Verfahren}\label{sec:af-verfahren}
+
+Die auslösenden Faktoren werden jährlich bis spätestens vier Monate
+nach Ende des Beobachtungsjahres berechnet und dem Treuhänder sowie
+der Aufsichtsbehörde vorgelegt (\S\,17 KVAV). Springt mindestens ein
+auslösender Faktor einer Beobachtungseinheit an, werden alle
+Rechnungsgrundlagen dieser Beobachtungseinheit überprüft und die
+Beiträge gemäß Abschnitt~\ref{sec:bap} neu berechnet; der
+Sicherheitszuschlag darf dabei nicht erhöht werden, soweit die
+Anpassung hierauf beruht. Soweit Leistungen bei der Erst- oder einer
+Neukalkulation erkennbar unzureichend kalkuliert waren, erfolgt
+insoweit keine Anpassung (\S\,155 Abs.\,3 VAG).

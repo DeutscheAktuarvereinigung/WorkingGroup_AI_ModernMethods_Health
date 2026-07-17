@@ -1,0 +1,231 @@
+{
+  "dokument": "..\\2_Synthetische_TB\\TB_VitalPlus.pdf",
+  "seiten": 93,
+  "modell": "claude-sonnet-5",
+  "zusammenfassung": {
+    "fehler": 0,
+    "warnungen": 5,
+    "checks": 19,
+    "uebersprungen": 0
+  },
+  "checks": [
+    {
+      "id": "V-01",
+      "titel": "Kaputte Verweise („??“)",
+      "kategorie": "dokumentintern",
+      "methode": "deterministisch",
+      "status": "BESTANDEN",
+      "hinweis": "93 Seiten durchsucht.",
+      "dauer_s": 0.0,
+      "befunde": []
+    },
+    {
+      "id": "V-02",
+      "titel": "Existenz interner Verweise",
+      "kategorie": "dokumentintern",
+      "methode": "deterministisch",
+      "status": "BESTANDEN",
+      "hinweis": "252 Teil-Verweise und 35 Gleichungs-Verweise geprüft.",
+      "dauer_s": 0.01,
+      "befunde": []
+    },
+    {
+      "id": "V-03",
+      "titel": "Inhaltsverzeichnis (Titel und Seitenzahlen)",
+      "kategorie": "dokumentintern",
+      "methode": "deterministisch",
+      "status": "BESTANDEN",
+      "hinweis": "65 IHV-Einträge gegen Überschriften geprüft (Seitenversatz +1).",
+      "dauer_s": 0.0,
+      "befunde": []
+    },
+    {
+      "id": "V-04",
+      "titel": "Vollständigkeit des Symbolverzeichnisses",
+      "kategorie": "dokumentintern",
+      "methode": "deterministisch",
+      "status": "BESTANDEN",
+      "hinweis": "140 verschiedene Symbole gegen 59 Glossar-Einträge geprüft.",
+      "dauer_s": 0.02,
+      "befunde": []
+    },
+    {
+      "id": "V-05",
+      "titel": "Tabellen-Identitäten und Rechnungszins",
+      "kategorie": "dokumentintern",
+      "methode": "deterministisch",
+      "status": "BESTANDEN",
+      "hinweis": "180 Zeilen-Identitäten geprüft.",
+      "dauer_s": 0.0,
+      "befunde": []
+    },
+    {
+      "id": "V-06",
+      "titel": "Monotonie der Beitragstabellen",
+      "kategorie": "dokumentintern",
+      "methode": "deterministisch",
+      "status": "WARNUNG",
+      "hinweis": "356 Altersübergänge geprüft.",
+      "dauer_s": 0.0,
+      "befunde": [
+        {
+          "schwere": "WARNUNG",
+          "seite": 90,
+          "beschreibung": "Anhang 3, Spalte b_x (Spalte 5): Wert fällt von Alter 64 (814,70) auf Alter 65 (813,43). Kann systembedingt sein, sollte aber geprüft werden."
+        }
+      ]
+    },
+    {
+      "id": "V-07",
+      "titel": "Abgleich mit Referenzwerten (CSV)",
+      "kategorie": "dokumentextern",
+      "methode": "deterministisch",
+      "status": "BESTANDEN",
+      "hinweis": "24 Spalten den Referenz-CSVs zugeordnet, 2160 Zellen verglichen.",
+      "dauer_s": 0.6,
+      "befunde": []
+    },
+    {
+      "id": "V-08",
+      "titel": "Konsistenz benannter Parameter",
+      "kategorie": "dokumentintern",
+      "methode": "deterministisch",
+      "status": "BESTANDEN",
+      "hinweis": "14 Parameter-Zuweisungen zu 12 Symbolen geprüft.",
+      "dauer_s": 0.01,
+      "befunde": []
+    },
+    {
+      "id": "V-09",
+      "titel": "Gesetzes- und Paragrafen-Prüfung",
+      "kategorie": "dokumentextern",
+      "methode": "deterministisch",
+      "status": "BESTANDEN",
+      "hinweis": "6 Normbezüge bzw. Zuschlagsangaben geprüft.",
+      "dauer_s": 0.02,
+      "befunde": []
+    },
+    {
+      "id": "V-10",
+      "titel": "Referenzen auf Rahmen-Berechnungsgrundlagen",
+      "kategorie": "dokumentextern",
+      "methode": "deterministisch",
+      "status": "BESTANDEN",
+      "hinweis": "8 Referenzen gegen ein Register mit 3 Einträgen geprüft.",
+      "dauer_s": 0.0,
+      "befunde": []
+    },
+    {
+      "id": "V-11",
+      "titel": "Versions- und Stichtagskonsistenz",
+      "kategorie": "dokumentintern",
+      "methode": "deterministisch",
+      "status": "BESTANDEN",
+      "hinweis": "99 Nummern- und 92 Datumsangaben geprüft (Dokumentstand: Nr. 17); Historie bis Nr. 17.",
+      "dauer_s": 0.01,
+      "befunde": []
+    },
+    {
+      "id": "V-12",
+      "titel": "Vollständigkeit und Wertebereiche der Alterstabellen",
+      "kategorie": "dokumentintern",
+      "methode": "deterministisch",
+      "status": "BESTANDEN",
+      "hinweis": "9 Alterstabellen mit 3473 Werten auf Lücken, Endalter und Wertebereiche geprüft.",
+      "dauer_s": 0.01,
+      "befunde": []
+    },
+    {
+      "id": "V-13",
+      "titel": "Abgleich mit der Referenzdatenbank (SQLite)",
+      "kategorie": "dokumentextern",
+      "methode": "deterministisch",
+      "status": "BESTANDEN",
+      "hinweis": "8 Spalten der Datenbank zugeordnet, 720 Zellen verglichen (rechnungsgrundlagen.db).",
+      "dauer_s": 0.01,
+      "befunde": []
+    },
+    {
+      "id": "L-01",
+      "titel": "Rechtschreibprüfung",
+      "kategorie": "dokumentintern",
+      "methode": "LLM",
+      "status": "BESTANDEN",
+      "hinweis": "15 Text-Chunks mit claude-sonnet-5 geprüft.",
+      "dauer_s": 0.06,
+      "befunde": []
+    },
+    {
+      "id": "L-02",
+      "titel": "Nachrechnen der Beispiel- und Formelwerte",
+      "kategorie": "dokumentintern",
+      "methode": "LLM",
+      "status": "BESTANDEN",
+      "hinweis": "14 Rechnungen in Python nachgerechnet und verglichen; 4 übersprungen (keine konkreten oder nicht im Dokument belegte Zahlen) (claude-sonnet-5).",
+      "dauer_s": 0.01,
+      "befunde": []
+    },
+    {
+      "id": "L-03",
+      "titel": "Konsistenz Abschnitt ↔ Anlage/Anhang",
+      "kategorie": "dokumentintern",
+      "methode": "LLM",
+      "status": "WARNUNG",
+      "hinweis": "15 Teil-Paare mit claude-sonnet-5 verglichen.",
+      "dauer_s": 0.05,
+      "befunde": [
+        {
+          "schwere": "WARNUNG",
+          "seite": 92,
+          "beschreibung": "Widerspruch „Formel des Jahresnettobeitrags Px“: Teil A, Abschnitt 3.2 (Seite 35) nennt „Px = G · Ax (keine Division durch den Rentenbarwert ax in der Formel enthalten)“, Teil B, Anhang 5, Schritt 3, Gleichung (19) (Seite 92) dagegen „P43 = GM · A43 = 1901,0070 · 44,1833 = 4667,48 EUR“ – Die in Teil A angegebene Formel Px = G · Ax enthält keine Division durch den Rentenbarwert ax. Setzt man jedoch die in Teil B genannten Werte GM = 1901,0070 und A43 = 44,1833 in genau diese Formel ein, ergibt sich 1901,0070 · 44,1833 ≈ 83.997,7 EUR und nicht 4667,48 EUR. Der ausgewiesene Wert 4667,48 EUR entspricht stattdessen GM · A43 / a43 (mit a43 = 17,9953). Die in Teil A dargestellte Formel passt somit nicht zu dem in Teil B eingesetzten und berechneten Zahlenwert."
+        }
+      ]
+    },
+    {
+      "id": "L-04",
+      "titel": "Plausibilität der Normzitate",
+      "kategorie": "dokumentextern",
+      "methode": "LLM",
+      "status": "WARNUNG",
+      "hinweis": "73 Normzitate mit claude-sonnet-5 bewertet.",
+      "dauer_s": 0.0,
+      "befunde": [
+        {
+          "schwere": "WARNUNG",
+          "seite": 11,
+          "beschreibung": "Normzitat „§ 146 Abs. 1 Nr. 5 VAG“ ist fraglich: Der Anspruch auf Mitgabe eines Übertragungswertes wird in der Literatur häufig einer anderen Nummer innerhalb § 146 Abs. 1 VAG zugeordnet; genauer Wortlaut ist mir nicht sicher bekannt."
+        },
+        {
+          "schwere": "WARNUNG",
+          "seite": 24,
+          "beschreibung": "Normzitat „§ 146 Abs. 2 VAG“ ist fraglich: Der beschriebene Grundsatz monoton nicht fallender Beiträge wird häufig einem anderen Absatz/Nummer des § 146 VAG zugeordnet; genaue Zuordnung ist unsicher."
+        },
+        {
+          "schwere": "WARNUNG",
+          "seite": 36,
+          "beschreibung": "Normzitat „§ 146 Abs. 2 VAG“ ist fraglich: § 146 VAG enthält Grundsätze der Prämienkalkulation einschließlich Gleichbehandlungsgeboten; der genaue Absatz ist ohne Normtext nicht sicher verifizierbar."
+        }
+      ]
+    },
+    {
+      "id": "L-05",
+      "titel": "Vision-Prüfung des Formelsatzes",
+      "kategorie": "dokumentintern",
+      "methode": "LLM",
+      "status": "BESTANDEN",
+      "hinweis": "22 Formelseiten als Bild geprüft (claude-sonnet-5).",
+      "dauer_s": 3.51,
+      "befunde": []
+    },
+    {
+      "id": "L-06",
+      "titel": "Grafik-Tabellen-Abgleich",
+      "kategorie": "dokumentintern",
+      "methode": "LLM",
+      "status": "BESTANDEN",
+      "hinweis": "2 Diagrammseite(n) blind abgelesen (claude-sonnet-5), 4 Kurven deterministisch den Tabellenspalten zugeordnet (krass = Median-Abweichung > 20 %). Ablesegenauigkeit: S.75: Die x-Achse reicht von 20 bis 110 mit Gitterlinien in 10er-Schritten, die y-Achse von 1 bis 6 mit Gitterlinien in 1er-Schritten. Die Kurvenpunkte wurden anhand der Rasterlinien und der Kurvensteigung visuell interpoliert; eine Ablesegenauigkeit von besser als ±0,1–0,2 Einheiten ist bei der Diagrammauflösung nicht möglich, besonders im steilen Anstiegsbereich zwischen 50 und 80 Jahren. Die Plateauwerte ab etwa Alter 90 sind gut ablesbar, da die Kurven dort flach verlaufen. | S.78: Y-Achse ist skaliert mit Faktor 10^4 und rei",
+      "dauer_s": 0.72,
+      "befunde": []
+    }
+  ]
+}

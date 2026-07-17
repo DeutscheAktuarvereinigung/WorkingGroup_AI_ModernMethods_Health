@@ -1,0 +1,225 @@
+% =====================================================================
+% Technische Berechnungsgrundlagen -- Tarif VitalPlus (SYNTHETISCH)
+% Feldafinger Brandkasse (FFBK) -- fiktives Unternehmen
+% Fiktives Beispieldokument zu Schulungs- und Validierungszwecken.
+% Layout:
+%  - drei gleichrangige Hauptteile (Abschnitte / Anlagen / Anhaenge)
+%    mit Trennerseiten und part-Eintraegen im Inhaltsverzeichnis
+%  - Ueberschriften mit Teil-Praefix: "Abschnitt 2.1: ..." / "Anlage 2.1: ..."
+%  - jede(r) (Unter-)Abschnitt und (Unter-)Anlage beginnt auf neuer Seite
+%  - Inhaltsverzeichnis separat ganz vorne (ohne Abschnittsnummer)
+%  - alle Zahlenwerte zentral aus gen/gen_parameter.tex (Pipeline)
+% =====================================================================
+\documentclass[a4paper,11pt]{article}
+
+\usepackage[left=2cm,right=2cm,top=1cm,bottom=1.6cm,includeheadfoot,headheight=46pt,headsep=0.6cm]{geometry}
+\usepackage{cmap}             % korrekte Unicode-Zuordnung im PDF-Text-Layer (vor fontenc laden)
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}          % Vektorfonts statt Bitmap-EC-Fonts
+\input{glyphtounicode}
+\pdfgentounicode=1
+\usepackage[ngerman]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage[colorlinks=true,linkcolor=ffbkblau,urlcolor=ffbkblau]{hyperref}
+
+% Hausfarben der Feldafinger Brandkasse (fiktiv); in Grafiken gilt:
+% Maenner = dunkles Blau, Frauen = dunkles Rot
+\definecolor{ffbkblau}{RGB}{31,78,121}
+\definecolor{ffbkrot}{RGB}{158,27,50}
+
+% Kein Logo: In der Kopfzeile steht der Unternehmensname
+\newcommand{\unternehmen}{Feldafinger Brandkasse (FFBK)}
+
+% Zentrale Parameter aus der Kalkulationspipeline
+\input{gen/gen_parameter}
+
+% ------------------------------------------------------------------
+% Teil-Praefix fuer Ueberschriften und Inhaltsverzeichnis
+% (\TBteilname = "Abschnitt" / "Anlage" / "Anhang", je Hauptteil)
+% ------------------------------------------------------------------
+\newcommand{\TBteilname}{Abschnitt}
+
+% Ueberschriftenformate mit Praefix und Doppelpunkt.
+% Level-0- (section) und Level-1-Ueberschriften (subsection) tragen im
+% Fliesstext dieselbe Schriftgroesse (\Large); nur das Inhaltsverzeichnis
+% differenziert weiterhin ueber Einrueckung/Schriftschnitt.
+\titleformat{\section}
+  {\Large\bfseries}{\TBteilname~\thesection:}{0.6em}{}
+\titleformat{\subsection}
+  {\Large\bfseries}{\TBteilname~\thesubsection:}{0.6em}{}
+\titleformat{\subsubsection}
+  {\large\bfseries}{\TBteilname~\thesubsubsection:}{0.6em}{}
+
+% Jede(r) (Unter-)Abschnitt bzw. (Unter-)Anlage beginnt auf neuer Seite
+\newcommand{\sectionbreak}{\clearpage}
+\newcommand{\subsectionbreak}{\clearpage}
+\newcommand{\subsubsectionbreak}{\clearpage}
+
+% Teil-Angabe der Kopfzeile ueber TeX-Marks (haengt an den Ueberschriften,
+% dadurch stets korrekt auch bei Seitenumbruechen und Fortsetzungsseiten)
+\renewcommand{\sectionmark}[1]{\markright{\TBteilname~\thesection}}
+\renewcommand{\subsectionmark}[1]{\markright{\TBteilname~\thesubsection}}
+
+% Inhaltsverzeichnis: Praefix vor den Nummern (wird je Hauptteil
+% umgeschaltet), Doppelpunkt nach der Nummer, grosszuegige Nummernbreite
+\renewcommand{\cftsecpresnum}{Abschnitt~}
+\renewcommand{\cftsecaftersnum}{:}
+\renewcommand{\cftsubsecpresnum}{Abschnitt~}
+\renewcommand{\cftsubsecaftersnum}{:}
+\renewcommand{\cftsubsubsecpresnum}{Abschnitt~}
+\renewcommand{\cftsubsubsecaftersnum}{:}
+\setlength{\cftsecnumwidth}{7.2em}
+\setlength{\cftsubsecnumwidth}{8.2em}
+\setlength{\cftsubsubsecnumwidth}{9.4em}
+\setlength{\cftsubsecindent}{1.0em}
+\setlength{\cftsubsubsecindent}{2.0em}
+\renewcommand{\cftpartfont}{\Large\bfseries}
+\setlength{\cftbeforepartskip}{2.4em}
+
+% Hauptteil-Trenner: Trennerseite + part-Eintrag im IHV + Praefix-Umschaltung
+% #1 Titel (z. B. "Anlagen"), #2 Praefix (z. B. "Anlage"), #3 Untertext
+\newcommand{\TBhauptteil}[3]{%
+  \clearpage
+  \renewcommand{\TBteilname}{#2}%
+  % Eigener hyperref-Ankernamensraum je Hauptteil: Abschnitte und Anlagen
+  % tragen dieselben Nummern (z. B. 2.3.2), erzeugten dadurch aber gleich
+  % benannte PDF-Sprungziele -- Verweise auf eine Anlage landeten beim
+  % gleichnummerierten Abschnitt. Der Teil-Praefix macht die Ziele eindeutig.
+  \renewcommand{\theHsection}{#2.\thesection}%
+  \renewcommand{\theHsubsection}{#2.\thesubsection}%
+  \renewcommand{\theHsubsubsection}{#2.\thesubsubsection}%
+  \addtocontents{toc}{\protect\renewcommand{\protect\cftsecpresnum}{#2~}}%
+  \addtocontents{toc}{\protect\renewcommand{\protect\cftsubsecpresnum}{#2~}}%
+  \addtocontents{toc}{\protect\renewcommand{\protect\cftsubsubsecpresnum}{#2~}}%
+  \phantomsection
+  \addcontentsline{toc}{part}{#1}%
+  \markright{#1}%
+  \vspace*{0.32\textheight}
+  \begin{center}{\Huge\bfseries #1}\end{center}
+  \begin{center}\begin{minipage}{0.8\textwidth}\centering #3\end{minipage}\end{center}
+  \clearpage
+}
+
+% \setzeTeil ist durch die Mark-Mechanik ersetzt (Aufrufe bleiben wirkungslos)
+\newcommand{\setzeTeil}[1]{}
+
+% Kopfzeile: drei Zeilen, zwei Spalten, einheitliche Schriftgroesse.
+% Die rechte Wertespalte hat eine feste Breite, damit der Kopf auf allen
+% Seiten gleich breit ist (unabhaengig vom laengsten "Teil:"-Eintrag).
+\newlength{\kopfwertbreite}
+\setlength{\kopfwertbreite}{3.4cm}
+\fancypagestyle{myheader}{%
+    \fancyhf{}
+    \renewcommand{\headrulewidth}{0.4pt}
+    \lhead{\small\begin{tabular}{@{}l@{}}
+        \textbf{Feldafinger Brandkasse (FFBK)}\\
+        \textbf{Technische Berechnungsgrundlagen}\\
+        \textbf{Tarif VitalPlus}\\
+    \end{tabular}}
+    \rhead{\small\begin{tabular}{@{}l@{\hspace{0.5em}}p{\kopfwertbreite}@{}}
+        \textbf{Änderungsnr.:} & 17 (ab 01.01.2025)\\
+        \textbf{Teil:} & \rightmark\\
+        \textbf{Blatt:} & \thepage\,/\,\pageref*{LastPage}\\
+    \end{tabular}}
+}
+% 'plain' (wird u. a. von der ersten IHV-Seite intern gesetzt)
+% traegt denselben Kopf wie 'myheader'
+\fancypagestyle{plain}{%
+    \fancyhf{}
+    \renewcommand{\headrulewidth}{0.4pt}
+    \lhead{\small\begin{tabular}{@{}l@{}}
+        \textbf{Feldafinger Brandkasse (FFBK)}\\
+        \textbf{Technische Berechnungsgrundlagen}\\
+        \textbf{Tarif VitalPlus}\\
+    \end{tabular}}
+    \rhead{\small\begin{tabular}{@{}l@{\hspace{0.5em}}p{\kopfwertbreite}@{}}
+        \textbf{Änderungsnr.:} & 17 (ab 01.01.2025)\\
+        \textbf{Teil:} & \rightmark\\
+        \textbf{Blatt:} & \thepage\,/\,\pageref*{LastPage}\\
+    \end{tabular}}
+}
+\pagestyle{myheader}
+
+% Abschnittsnummerierung beginnt bei 0 (Abschnitt 0 = Übersichten)
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{3}
+\renewcommand{\thesection}{\arabic{section}}
+
+\usepackage{eurosym}
+
+\begin{document}
+
+\input{titelseite}
+
+% ------------------------------------------------------------------
+% Inhaltsverzeichnis: separat ganz vorne, ohne Abschnittsnummer
+% ------------------------------------------------------------------
+\markright{Inhaltsverzeichnis}
+\renewcommand{\cftmarktoc}{\markboth{Inhaltsverzeichnis}{Inhaltsverzeichnis}}
+% tocloft setzt auf der ersten IHV-Seite den Stil 'plain'; Kopf erzwingen
+\thispagestyle{myheader}
+{\hypersetup{linkcolor=black}\tableofcontents}
+\clearpage
+
+% ==================================================================
+% HAUPTTEIL 1: ABSCHNITTE
+% ==================================================================
+\TBhauptteil{Abschnitte}{Abschnitt}{Grundsätzliche Festlegungen des
+Tarifs VitalPlus, die sich nicht oder nur selten ändern.}
+
+\setzeTeil{Abschnitt 0}
+\setcounter{section}{-1}
+\input{abschnitt_0}
+
+\setzeTeil{Abschnitt 1}
+\input{abschnitt_1}
+
+\setzeTeil{Abschnitt 2}
+\input{abschnitt_2}
+
+\setzeTeil{Abschnitt 3}
+\input{abschnitt_3}
+
+\setzeTeil{Abschnitt 4}
+\input{abschnitt_4}
+
+\setzeTeil{Abschnitt 5}
+\input{abschnitt_5}
+
+\setzeTeil{Abschnitt 6}
+\input{abschnitt_6}
+
+\setzeTeil{Abschnitte 7/8}
+\input{abschnitt_7_8}
+
+% ==================================================================
+% HAUPTTEIL 2: ANLAGEN
+% ==================================================================
+\TBhauptteil{Anlagen}{Anlage}{Veränderliche Bestandteile der TB
+(Rechnungsgrundlagen, Grundwerte und Nachweise); sie werden bei
+Beitragsanpassungen ausgetauscht. Nummerierung und Bezeichnung der
+Anlagen folgen den zugehörigen Abschnitten. Alle Tafeln gelten bis zum
+Schlussalter $\omega = 110$; das Endalter ist in jeder Tafel angegeben.}
+\setcounter{section}{0}
+\input{anlagen}
+
+% ==================================================================
+% HAUPTTEIL 3: ANHÄNGE
+% ==================================================================
+\TBhauptteil{Anhänge}{Anhang}{Beitragstabellen und Beispielrechnungen.}
+\setcounter{section}{2}
+\input{anhang}
+
+\end{document}

@@ -1,0 +1,351 @@
+% =====================================================================
+% ANLAGENTEIL -- Nummerierung und Bezeichnung folgen den Abschnitten
+% (Gibt es zu einem Abschnitt keine Anlage, entfaellt die Nummer.)
+% =====================================================================
+
+% ---------------------------------------------------------------------
+\setzeTeil{Anlage 1}
+\section{Allgemeines}\label{sec:anlagenteil1}
+
+Anlagen zu Abschnitt~1: Leistungsversprechen und Selbstbehalte des
+Tarifs.
+
+\setzeTeil{Anlage 1.1}
+\subsection{Allgemeine Darstellung des Tarifs}\label{sec:anlage1}
+
+Maßgeblich sind die AVB (Teil~I MB/KK~2009, Teil~II Tarifbedingungen
+VitalPlus, Stand 01/2019 -- letzte bedingungsseitige Änderung mit
+Änderungsnr.~11; die AVB liegen dieser TB als gesondertes Dokument
+bei). Kurzübersicht des Leistungsversprechens:
+
+\begin{center}\small
+\begin{tabular}{@{}lp{9.5cm}@{}}
+\toprule
+Leistungsbereich & Erstattung \\
+\midrule
+ambulante Heilbehandlung & 100\,\% nach GOÄ bis zu den Höchstsätzen; absoluter Selbstbehalt 100~EUR je Kalenderjahr (Kinder/Jugendliche: 0~EUR) \\
+stationäre Heilbehandlung & 100\,\% allgemeine Krankenhausleistungen, Unterbringung im Mehrbettzimmer \\
+Zahnbehandlung & 100\,\% \\
+Zahnersatz und Kieferorthopädie & 75\,\% (Erstattungsklasse 70--80\,\%) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Höhe und Entwicklung der Selbstbehalte:} Der absolute
+Selbstbehalt im ambulanten Bereich beträgt seit Tarifeinführung
+(01.01.1998) unverändert 100~EUR je Kalenderjahr für Erwachsene und
+0~EUR für Kinder und Jugendliche; alle Beobachtungseinheiten führen
+dieselbe Selbstbehaltsstufe.
+
+% ---------------------------------------------------------------------
+\setzeTeil{Anlage 2}
+\section{Rechnungsgrundlagen}\label{sec:anlagenteil2}
+
+Anlagen zu Abschnitt~2: Rechnungszinssätze, Ausscheideordnung,
+Kopfschäden und Zuschläge.
+
+\setzeTeil{Anlage 2.1}
+\subsection{Rechnungszinssatz}\label{sec:anlage21}
+
+Rechnungszinssätze $i$ je Beobachtungseinheit (jeweils unterhalb des
+AUZ von 2{,}8\,\%, Nachweis in der Rahmen-TB RTB-AUZ 2025-1):
+
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+Kinder/Jugendliche & Männer & Frauen \\
+\midrule
+$\ZinsK\,\%$ & $\ZinsM\,\%$ & $2{,}2\,\%$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Historie: Männer 3{,}0\,\% $\to$ 2{,}7\,\% (Änderung Nr.\,14); Frauen
+2{,}3\,\% $\to$ 2{,}0\,\% (Änderung Nr.\,15); Kinder/Jugendliche
+unverändert seit Änderung Nr.\,12.
+
+% ---------------------------------------------------------------------
+\setzeTeil{Anlage 2.2}
+\subsection{Ausscheideordnung}\label{sec:anlage221}
+
+Rechnungsmäßige Sterbewahrscheinlichkeiten $q_x$ (PKV-Sterbetafel 2025,
+Fortschreibung gemäß Gleichung~\eqref{eq:qfort}),
+Stornowahrscheinlichkeiten $w_x$ (unternehmenseigene Beobachtung,
+Abschnitt~\ref{sec:storno}), Ausscheidewahrscheinlichkeiten und
+diskontierte Übergangswahrscheinlichkeiten
+$DQ_x = v\,(1-(q+w)_x)$. Endalter: 110.
+
+\textbf{Nachweis der Stornowahrscheinlichkeiten:} Datenbasis der
+unternehmenseigenen Beobachtung 2021--2023 und Vergleich mit den
+bisher angesetzten Werten (Änderungsnr.~16); alle Angaben fiktiv:
+
+\begin{center}\small
+\begin{tabular}{@{}lrccc@{}}
+\toprule
+Altersband & Bestand (Personenjahre) & $\bar{w}$ beobachtet & $\bar{w}$ bisher & $\bar{w}$ neu \\
+\midrule
+21--25 & 14\,830 & 0{,}0994 & 0{,}1102 & 0{,}1054 \\
+26--35 & 41\,270 & 0{,}0801 & 0{,}0898 & 0{,}0846 \\
+36--50 & 68\,930 & 0{,}0392 & 0{,}0391 & 0{,}0391 \\
+51--65 & 55\,410 & 0{,}0181 & 0{,}0184 & 0{,}0184 \\
+66--110 & 21\,060 & 0{,}0021 & 0{,}0022 & 0{,}0022 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Die rechnungsmäßigen Werte $\bar{w}$ neu liegen oberhalb der
+beobachteten Rohwerte (Sicherheitsmarge, da eine Überschätzung des
+Stornos die Vererbung überzeichnen würde, vgl.
+Abschnitt~\ref{sec:tarifar}); in den Altern 21--35 wurden sie
+gegenüber dem bisherigen Ansatz um durchschnittlich
+0{,}5~Prozentpunkte gesenkt.
+
+\input{gen/gen_anlage_2_2_1_M}
+\clearpage
+\input{gen/gen_anlage_2_2_1_F}
+
+% ---------------------------------------------------------------------
+\setzeTeil{Anlage 2.3}
+\subsection{Kopfschaden}\label{sec:anlagenteil23}
+
+Die Unteranlagen dokumentieren die Herleitung der rechnungsmäßigen
+Kopfschäden gemäß Abschnitt~\ref{sec:kopfschaden} aus den öffentlichen
+Stützdaten (BaFin-Kopfschadenstatistik, Beobachtungsjahr 2022).
+
+\setzeTeil{Anlage 2.3.2}
+\setcounter{subsubsection}{1}
+\subsubsection{Umlage der Schwangerschafts- und Mutterschaftskosten}\label{sec:anlage232}\markright{Anlage~2.3.2}
+
+Beobachtete Teilkopfschäden je Leistungsbereich nach Umlage der
+S-Kosten gemäß Gleichungen~\eqref{eq:sumlage}--\eqref{eq:ksumme}
+(Quelle: BaFin-Kopfschadenstatistik, Beobachtungsjahr 2022; Tafeln
+gemäß Abschnitt~\ref{sec:kopfschaden-grundsaetze}; Tafelbereich
+Alter 0--100, Fortschreibung der Alter 101--110 gemäß
+Gleichung~\eqref{eq:kfort}). Zur Nachvollziehbarkeit der Umlage sind
+je Alter die Summe der S-Kosten $\sum K^{S}_x$ (Frauentafel) und die
+Summe der Umlagen $\sum u_x$ über die vier Leistungsbereiche
+angegeben; die Rohwerte vor Umlage sowie die in
+Gleichung~\eqref{eq:sumlage} verwendeten Bestände $n^{M}_x$, $n^{W}_x$
+(Gewichte, auch für die Gruppenmittel der Kinder und Jugendlichen)
+sind die veröffentlichten Werte der genannten BaFin-Tafeln (Spalten
+KOPFSCHADEN und BESTAND) und werden hier nicht abgedruckt. Die
+Summenspalte ist Grundlage der Profile und Grundkopfschäden in
+Anlage~\ref{sec:anlage233}.
+
+Die für die Fortschreibung der Alter 101--110
+(Gleichung~\eqref{eq:kfort}) maßgebliche mittlere jährliche
+Veränderungsrate der Gesamtkopfschäden der Alter 95 bis 100 beträgt
+\WachstumM\,\% p.\,a. (Männer) bzw. \WachstumF\,\% p.\,a. (Frauen).
+
+\input{gen/gen_anlage_2_3_2_M}
+\clearpage
+\input{gen/gen_anlage_2_3_2_F}
+
+% ---------------------------------------------------------------------
+\setzeTeil{Anlage 2.3.3}
+\subsubsection{Herleitung der rechnungsmäßigen Profile und Grundkopfschäden}\label{sec:anlage233}\markright{Anlage~2.3.3}
+
+Rechnungsmäßige Profile $k_x$ gemäß Abschnitt~\ref{sec:kopfschaden}
+(Normierungsalter 40, Monotonisierung ab dem Monotonisierungsalter
+$\tilde{x} = \MonoAlter$, Fortschreibung ab Alter 101) sowie
+rechnungsmäßige Kopfschäden $K_x = k_x\cdot G$ mit
+$G^{M} = 1910{,}0070$~EUR und $G^{F} = \GFrau$~EUR
+(Gleichung~\eqref{eq:gks}). Endalter: 110.
+
+\paragraph{Kopfschäden der Kinder und Jugendlichen.}
+Die altersunabhängigen mittleren Kopfschäden gemäß
+Abschnitt~\ref{sec:kopfschaden-kinder} betragen (Kinder
+geschlechtsunabhängig, Jugendliche nach Geschlecht getrennt)
+\begin{equation}
+\bar{K}_{\mathrm{Ki}} = \KKinder, \qquad
+\bar{K}^{M}_{\mathrm{Ju}} = \KJugendM, \qquad
+\bar{K}^{F}_{\mathrm{Ju}} = \KJugendF
+\qquad\text{(EUR p.\,a.)}.
+\label{eq:kkinder}
+\end{equation}
+
+\paragraph{Festsetzung und Sicherheitsnachweis der Grundkopfschäden.}
+Der rechnungsmäßige Grundkopfschaden wird je Beobachtungseinheit als
+$G = K^{\mathrm{beob}}_{40}$ festgesetzt:
+\begin{equation}
+G^{M} = \GMann\;\text{EUR p.\,a.},
+\qquad
+G^{F} = \GFrau\;\text{EUR p.\,a.}
+\label{eq:gks}
+\end{equation}
+Die rechnungsmäßigen Profile $k_x$ und die rechnungsmäßigen
+Kopfschäden $K_x = k_x\cdot G$ enthält Anlage~\ref{sec:anlage233}.
+
+\textbf{Nachweis der ausreichenden Sicherheit (Festlegung):} Auf eine
+Trendextrapolation der Grundkopfschäden auf den Kalkulationsstichtag
+wird verzichtet, da die rechnungsmäßigen Grundkopfschäden der
+Stützdaten oberhalb der im eigenen Bestand beobachteten tatsächlichen
+Grundkopfschäden liegen (Ermittlung gemäß
+Abschnitt~\ref{sec:af-gks}; fiktive Werte):
+
+\begin{center}\small
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+ & $G^{(1)}$ (2021) & $G^{(2)}$ (2022) & $G^{(3)}$ (2023) & $G^{\mathrm{ext}}$ & $G^{\mathrm{rech}}$ \\
+\midrule
+Männer & 1\,750{,}11 & 1\,769{,}84 & 1\,790{,}06 & 1\,829{,}93 & \GMann \\
+Frauen & 2\,681{,}52 & 2\,708{,}77 & 2\,738{,}90 & 2\,795{,}80 & \GFrau \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Der extrapolierte tatsächliche Grundkopfschaden $G^{\mathrm{ext}}$
+(Gleichung~\eqref{eq:af-ext}) unterschreitet den rechnungsmäßigen
+Ansatz um 3{,}7\,\% (Männer) bzw. 3{,}5\,\% (Frauen); die
+Kopfschäden sind damit ausreichend sicher im Sinne des \S\,2 Abs.\,3
+KVAV. Gegenüber der vorherigen Kalkulation (Änderungsnr.~16) erhöhen
+sich die rechnungsmäßigen Kopfschäden bestandsgewichtet um 9{,}0\,\%
+(Männer) bzw. 7{,}0\,\% (Frauen), entsprechend den auslösenden
+Faktoren der Änderungshistorie (Abschnitt~\ref{sec:historie}); die
+Angemessenheit wird zudem jährlich über die auslösenden Faktoren gemäß
+Abschnitt~\ref{sec:af} überprüft.
+
+
+\input{gen/gen_anlage_2_3_1}
+
+\begin{figure}[h!]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[
+            width=0.92\textwidth, height=0.5\textwidth,
+            grid=both, xlabel={Alter $x$},
+            ylabel={normierter Kopfschaden $k_x$},
+            legend pos=north west]
+            \input{gen/gen_plot_kx}
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Rechnungsmäßige Profile des Tarifs VitalPlus}
+    \label{fig:profile}
+\end{figure}
+
+\clearpage
+\input{gen/gen_anlage_2_3_3}
+
+\begin{figure}[h!]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[
+            width=0.92\textwidth, height=0.5\textwidth,
+            grid=both, xlabel={Alter $x$},
+            ylabel={rechnungsmäßiger Kopfschaden $K_x$ (EUR p.\,a.)},
+            legend pos=north west]
+            \input{gen/gen_plot_kopfschaeden}
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Rechnungsmäßige Kopfschäden $K_x = k_x\cdot G$ des Tarifs
+    VitalPlus (Männer und Frauen)}
+    \label{fig:kopfschaeden}
+\end{figure}
+
+% ---------------------------------------------------------------------
+\setzeTeil{Anlage 2.4}
+\subsection{Zuschläge}\label{sec:anlage241}
+\markright{Anlage~2.4}
+Der Sicherheitszuschlag ist festgesetzt auf
+\begin{equation}
+\sigma = \SigmaZ\,\%
+\label{eq:sigma}
+\end{equation}
+des Bruttobeitrags für alle Beobachtungseinheiten und Alter.
+
+
+\begin{center}\small
+\begin{tabular}{@{}l*{4}{>{\centering\arraybackslash}p{2.1cm}}@{}}
+\toprule
+ & \multicolumn{2}{c}{Männer} & \multicolumn{2}{c}{Frauen} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Zuschlag & $x\le 64$ & $x\ge 65$ & $x\le 64$ & $x\ge 65$ \\
+\midrule
+Sicherheitszuschlag $\sigma$ & 4{,}5\,\% & 4{,}5\,\% & 4{,}5\,\% & 4{,}5\,\% \\
+Standard-/Basistarif $\Omega_x$ & \OmegaU\,\% & \OmegaO\,\% & \OmegaU\,\% & \OmegaO\,\% \\
+Kostensätze $\Delta_x$ (rechnerisch) & \DeltaU\,\% & \DeltaO\,\% & \DeltaU\,\% & \DeltaO\,\% \\
+\midrule
+$\gamma^{\mathrm{Kosten}}_x$ (EUR p.\,a.) & \GammaKostMu & \GammaKostMo & \GammaKostFu & \GammaKostFo \\
+$\gamma^{\mathrm{euBR}}$ (EUR p.\,a.) & \GammaEuBRM & \GammaEuBRM & \GammaEuBRF & \GammaEuBRF \\
+$\gamma_x$ gesamt (EUR p.\,a.) & \GammaMu & \GammaMo & \GammaFu & \GammaFo \\
+\midrule
+Zillmersatz $\alpha_x$ (Monatsbeiträge) & \multicolumn{4}{c}{$\AlphaZ$ für $21\le x\le 75$, abschmelzend bis 0 ab Alter 80 (Gl.~\eqref{eq:zillmer})} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Kostensätze (Rahmen-TB \mbox{RTB-Kosten}, Version 2024-2)} in
+Prozent des Bruttobeitrags; sie sind Grundlage der rechnerischen Summen
+$\Delta_x$ der obigen Übersicht und der Umrechnung in die absoluten
+Kostenzuschläge gemäß Abschnitt~\ref{sec:kosten}:
+
+\begin{center}\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Kostenart (\S\,8 Abs.\,1 KVAV) & $x \le 64$ & $x \ge 65$ \\
+\midrule
+unmittelbare Abschlusskosten, laufender Zuschlag $\alpha_u$ & 2{,}0\,\% & --- \\
+mittelbare Abschlusskosten $\alpha_m$ & 5{,}0\,\% & 5{,}0\,\% \\
+Schadenregulierungskosten $\rho$ & 4{,}4\,\% & 4{,}4\,\% \\
+sonstige Verwaltungskosten $\beta$ & 2{,}6\,\% & 2{,}6\,\% \\
+\midrule
+Summe $\Delta_x$ & \DeltaU\,\% & \DeltaO\,\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Kinder/Jugendliche: $\gamma^{K} = \GammaKi$~EUR p.\,a.
+($\gamma^{\mathrm{euBR}} = \GammaEuBRK$~EUR,
+$\gamma^{\mathrm{Kosten}} = \GammaKostKi$~EUR); Gamma-Alter:
+Männer \GammaAlterM, Frauen \GammaAlterF. Die Basistarif-Komponente
+von $\Omega_x$ (0{,}6\,\%) ist branchenweit einheitlich, die
+Standardtarif-Komponente (0{,}1\,\%, $x \le 64$) poolbedingt
+(Abschnitt~\ref{sec:omega}).
+
+% ---------------------------------------------------------------------
+\setzeTeil{Anlage 3}
+\setcounter{section}{2}
+\section{Berechnung der Beiträge für den Neuzugang}\label{sec:anlagenteil3}
+
+Anlagen zu Abschnitt~3: versicherungstechnische Grundwerte.
+
+\setzeTeil{Anlage 3.1}
+\subsection[Grundwerte der Versicherungstechnik]{Versicherungstechnische Grundwerte}\label{sec:anlage311}
+
+Leistungsbarwerte $A_x$ (Profileinheiten) und Rentenbarwerte $a_x$
+gemäß den Rekursionen~\eqref{eq:rekA} und \eqref{eq:reka}
+(Rechnungszins: Männer \ZinsM\,\%, Frauen \ZinsF\,\%). Endalter: 110.
+
+\input{gen/gen_anlage_3_1_1}
+
+% ---------------------------------------------------------------------
+\setzeTeil{Anlage 5}
+\setcounter{section}{4}
+\section{Ermittlung der Alterungsrückstellung}\label{sec:anlagenteil5}
+
+Anlagen zu Abschnitt~5: gemittelte Barwerte für die
+Bilanzdeckungsrückstellung und Nachweis nach \S\,8 Abs.\,3 KVAV.
+
+\setzeTeil{Anlage 5.2}
+\setcounter{subsection}{1}
+\subsection{Bilanzdeckungsrückstellung}\label{sec:anlage521}
+
+\phantomsection\label{sec:anlage522}%
+Gemittelte Barwerte gemäß Gleichung~\eqref{eq:halbbarwerte} für die
+Bilanzdeckungsrückstellung (Abschnitt~\ref{sec:bilanzar}) sowie der
+Nachweis nach \S\,8 Abs.\,3 KVAV. Endalter: 110.
+
+\input{gen/gen_anlage_5_2_1}
+
+\clearpage
+\textbf{Nachweis nach \S\,8 Abs.\,3 KVAV:} Für jedes Eintrittsalter
+$x_e$ ist das erste Versicherungsjahr $m$ angegeben, ab dem die
+gezillmerte Alterungsrückstellung $V_{x_e+m}(b_{x_e})$ gemäß
+Gleichung~\eqref{eq:ar} nichtnegativ ist (Neuzugangsbeitrag, ohne
+Einmalbeträge; Eintrittsalter 21 bis 75, Endalter der
+Rückstellungsbewertung: 110). Das Maximum beträgt \MaxNegM~Jahre
+(Männer) bzw. \MaxNegF~Jahre (Frauen); die Grenzen des \S\,8 Abs.\,3
+KVAV (vier Jahre je Zugangsjahrgang, fünfzehn Jahre und halbe künftige
+Vertragsdauer je Einzelrückstellung) sind eingehalten.
+
+\input{gen/gen_anlage_5_2_2}

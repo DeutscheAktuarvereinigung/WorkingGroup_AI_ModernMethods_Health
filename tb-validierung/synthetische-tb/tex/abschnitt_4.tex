@@ -1,0 +1,137 @@
+\section{Berechnung der Beiträge bei Tarifänderungen}\label{sec:tarifaenderung}
+
+Dieser Abschnitt regelt die Beitragsberechnung bei individuellen
+Tarifänderungen, bei Beitragsanpassungen für den Bestand sowie die
+Beitragsermäßigungen im Alter.
+
+\subsection{Beiträge bei individuellen Tarifänderungen}\label{sec:umstufung}
+
+Bei individuellen Tarifänderungen (Tarifwechsel nach \S\,204 VVG,
+Höher-/Tieferstufungen innerhalb des Tarifs, z.\,B. Änderung des
+Selbstbehalts) wird der aus dem bisherigen Vertragsteil kalkulatorisch
+zugeordnete Anteil der Alterungsrückstellung gemäß \S\,13 Abs.\,1 KVAV
+vollständig prämienmindernd angerechnet. Die Berechnung folgt den
+Formeln des Abschnitts~B der Anlage~1 zur KVAV (\S\S\,12, 13 KVAV) in
+folgender Darstellung: Mit der Hilfsfunktion
+\begin{equation}
+b(u) = \frac{\bigl[12(1-\sigma-\Omega^{\mathrm{n}}_x)\,a^{\mathrm{n}}_x - \alpha^{\mathrm{n}}_x\bigr]\, b^{\mathrm{n}}_x
+      \;-\; \bigl[12(1-\sigma-\Omega^{\mathrm{a}}_x)\,a^{\mathrm{a}}_x - \alpha^{\mathrm{a}}_x\bigr]\, b^{\mathrm{a}}_x
+      \;+\; \bigl[12(1-\sigma-\Omega^{\mathrm{a}}_x)\,a^{\mathrm{a}}_x - u\bigr]\, b^{\mathrm{a}}}
+      {12(1-\sigma-\Omega^{\mathrm{n}}_x)\,a^{\mathrm{n}}_x - u}
+\label{eq:umstufung}
+\end{equation}
+ergibt sich der neue monatliche Beitrag als
+\begin{equation}
+b^{\mathrm{n}} = \max\{b(0);\, b(\tilde{\alpha})\},
+\qquad
+\hat{b}^{\mathrm{n}} = \max\bigl\{\min\{b^{\mathrm{n}};\, b^{\mathrm{n}}_x\};\, b^{\mathrm{n}}_{x_e}\bigr\},
+\label{eq:umstufung2}
+\end{equation}
+wobei
+\begin{itemize}\itemsep1pt
+  \item die Kennzeichnungen $\mathrm{a}$/$\mathrm{n}$ den alten bzw. neuen Vertragsteil
+        bezeichnen (bei Umstufungen innerhalb des Tarifs sind die
+        Rechnungsgrundlagen identisch),
+  \item $x$ das Alter bei Umstufung, $x_e$ das ursprüngliche
+        Eintrittsalter,
+  \item $u$ das in die Hilfsfunktion $b(\cdot)$ eingesetzte
+        Umtarifierungs-Kostenargument in Vielfachen des Monatsbeitrags;
+        es nimmt die Werte $u = 0$ (ohne Umtarifierungskosten) oder
+        $u = \tilde{\alpha}$ (mit Umtarifierungskosten) an,
+  \item $b^{\mathrm{a}}$ den bisher gezahlten monatlichen Beitrag,
+        $b^{\mathrm{a}}_x$, $b^{\mathrm{n}}_x$ die Tarifbeiträge des Alters $x$ und
+        $b^{\mathrm{n}}_{x_e}$ den Tarifbeitrag zum ursprünglichen
+        Eintrittsalter,
+  \item $\tilde{\alpha}$ den bei einer beitragserhöhenden Umstufung
+        angesetzten Umtarifierungs-Kostensatz in Vielfachen des
+        Monatsbeitrags; er ist auf $\tilde{\alpha} = 2$ festgelegt,
+        während bei nicht beitragserhöhenden Umstufungen keine
+        Umtarifierungskosten angesetzt werden ($\tilde{\alpha} = 0$).
+\end{itemize}
+bezeichnen. Die Hilfsfunktion $b(u)$ wird an den beiden
+Kostenargumenten $u = 0$ und $u = \tilde{\alpha}$ ausgewertet; da
+$b(u)$ je nach Vorzeichen monoton von $u$ abhängt, liefert
+$b^{\mathrm{n}} = \max\{b(0);\, b(\tilde{\alpha})\}$ den für den Bestand
+vorsichtigeren der beiden Randwerte. Die anschließende Kappung
+$\hat{b}^{\mathrm{n}}$ begrenzt diesen nach oben auf den Tarifbeitrag $b^{\mathrm{n}}_x$
+des erreichten Alters und nach unten auf den Neugeschäftsbeitrag
+$b^{\mathrm{n}}_{x_e}$ zum ursprünglichen Eintrittsalter. Die Untergrenze
+$b^{\mathrm{n}}_{x_e}$ stellt sicher, dass der neue Beitrag den
+Neugeschäftsbeitrag zum ursprünglichen Eintrittsalter nicht
+unterschreitet; ein hierdurch nicht verbrauchter Teil der angerechneten
+Alterungsrückstellung wird der Rückstellung zur Beitragsermäßigung im
+Alter zugeführt (\S\,13 Abs.\,1 KVAV).
+
+Die Gleichartigkeit des Versicherungsschutzes richtet sich nach den
+Leistungsbereichen des \S\,12 KVAV; ein Wechsel aus Tarifen mit
+gleichartigem Versicherungsschutz erfolgt unter voller Anrechnung nach
+Gleichung~\eqref{eq:umstufung}, bei nicht gleichartigem
+Versicherungsschutz wird nur der auf die gemeinsamen Leistungsbereiche
+entfallende Anteil der Alterungsrückstellung angerechnet. Entfällt bei
+einer Umstufung ein Leistungsbereich (Teilstorno), wird die zugehörige
+Alterungsrückstellung nicht angerechnet (\S\,12, \S\,13 Abs.\,2 KVAV).
+Mittel aus dem gesetzlichen Beitragszuschlag
+(Abschnitt~\ref{sec:zusatzrueckstellung}) und aus der Rückstellung nach
+\S\,150 Abs.\,2 VAG verbleiben bei individuellen Tarifänderungen
+innerhalb des Unternehmens ungekürzt dem Vertrag zugeordnet und werden
+ab dem Alter 65 gemäß Gleichung~\eqref{eq:gutschrift}
+beitragsmindernd eingesetzt.
+
+\textbf{Wegfall oder Hinzunahme bestimmter Leistungen} ist im Tarif
+VitalPlus nicht vorgesehen (kein Bausteintarif, für das Neugeschäft
+geschlossen); Leistungsänderungen im Rahmen einer Beitragsanpassung
+werden nach Abschnitt~\ref{sec:bap} behandelt. Ein gesonderter
+Abschnitt entfällt daher.
+
+\subsection{Beiträge für den Bestand bei Beitragsanpassungen}\label{sec:bap}
+
+Bei einer Beitragsanpassung (Abschnitt~\ref{sec:af}) werden die
+Beiträge des Bestandes gemäß \S\,11 KVAV nach den Grundsätzen der
+Neuzugangskalkulation (Abschnitt~\ref{sec:beitraege}) mit den
+aktualisierten Rechnungsgrundlagen neu berechnet; die vorhandene
+Alterungsrückstellung wird vollständig prämienmindernd angerechnet.
+Rechnerisch entspricht dies der Formel~\eqref{eq:umstufung} mit den
+alten und neuen Rechnungsgrundlagen desselben Tarifs und
+$\tilde{\alpha} = 0$ (in Prämien von Versicherten ab dem vollendeten
+45.~Lebensjahr werden gemäß \S\,11 Abs.\,2 KVAV keine erneuten
+einmaligen Abschlusskosten eingerechnet; das Unternehmen verzichtet
+generell auf einmalige Kosten bei Beitragsanpassungen).
+Risikozuschlagsfaktoren bleiben unverändert; absolute Selbstbehalte
+werden nur im Rahmen des \S\,203 Abs.\,2 VVG angepasst.
+
+\textbf{Limitierung:} Zur Begrenzung der Beitragssteigerung können
+Mittel aus der Rückstellung für Beitragsrückerstattung eingesetzt
+werden. Der limitierte Beitrag beträgt
+\begin{equation}
+b^{\mathrm{lim}} = \min\bigl\{\hat{b}^{\mathrm{n}};\;
+b^{\mathrm{a}} + A_{\mathrm{lim}};\; b^{\mathrm{a}}\cdot(1+R_{\mathrm{lim}})\bigr\},
+\label{eq:limit}
+\end{equation}
+wobei $\hat{b}^{\mathrm{n}}$ den formelmäßigen neuen Beitrag, $b^{\mathrm{a}}$ den
+bisherigen Beitrag sowie $A_{\mathrm{lim}}$ (EUR) bzw.
+$R_{\mathrm{lim}}$ (Prozentsatz) die vom Vorstand je
+Beitragsanpassung festgelegten absoluten bzw. relativen
+Limitierungsgrenzen bezeichnen. Die Beitragssenkung wird durch einen
+Einmalbetrag in die Alterungsrückstellung gegenfinanziert:
+\begin{equation}
+E = 12\cdot\bigl(\hat{b}^{\mathrm{n}} - b^{\mathrm{lim}}\bigr)\cdot
+\bigl(1-(\sigma+\Omega_x)\bigr)\cdot a_x,
+\label{eq:einmalbetrag}
+\end{equation}
+wobei $x$ das erreichte Alter und $a_x$ den Rentenbarwert bezeichnen.
+
+\subsection{Beitragsermäßigungen im Alter}\label{sec:beitragsermaessigung}
+
+Mittel der Rückstellungen nach \S\,150 VAG sowie nicht verbrauchte
+Teile des gesetzlichen Beitragszuschlags
+(Abschnitt~\ref{sec:zusatzrueckstellung}) werden ab dem Alter 65 zur
+Beitragsermäßigung eingesetzt; an über 80-jährige Versicherte werden
+Zinserträge gemäß \S\,150 Abs.\,3 VAG außerhalb einer
+Beitragsanpassung jährlich ausgekehrt. Ein Einmalbetrag $E$ mindert
+den Monatsbeitrag um
+\begin{equation}
+b^{E}_x = \frac{E}{12\cdot\bigl(1-(\sigma+\Omega_x)\bigr)\cdot a_x},
+\label{eq:gutschrift}
+\end{equation}
+wobei $x$ das Alter bei Anrechnung bezeichnet (keine Zillmerkosten bei
+Gutschriften).

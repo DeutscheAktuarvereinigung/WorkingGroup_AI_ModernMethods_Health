@@ -1,0 +1,6 @@
+# TB-Validierung - getestet mit Python 3.13 (Minimum: 3.11)
+# Das Notebook installiert fehlende Pakete beim Start auch selbst nach.
+pymupdf>=1.26
+pandas>=2.1
+anthropic>=0.60
+jupyter>=1.0
