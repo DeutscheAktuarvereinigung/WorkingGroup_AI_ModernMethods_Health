@@ -1,6 +1,6 @@
 # Fehlerprotokoll – TB_VitalPlus_fehlerhaft.pdf (Exemplar V-17b)
 
-Die fehlerhafte Zweitvariante (92 Seiten, Layout identisch zur sauberen Fassung) enthält **13 absichtlich eingebaute Fehler** als
+Die fehlerhafte Zweitvariante (93 Seiten, Layout identisch zur sauberen Fassung) enthält **13 absichtlich eingebaute Fehler** als
 Prüfobjekt für das Validierungs-Notebook (Phase 3). Die saubere Variante
 (`TB_VitalPlus.pdf`) ist frei von diesen Fehlern. Erzeugung reproduzierbar
 über `kalkulation/erzeuge_fehlervariante.py` (Quellen: `tex_fehlerhaft/`).

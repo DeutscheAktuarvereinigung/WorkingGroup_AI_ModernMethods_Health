@@ -22,7 +22,7 @@ tb-validierung/
 ├── requirements.txt           Python-Abhängigkeiten (getestet mit Python 3.13, Minimum 3.11)
 ├── synthetische-tb/
 │   ├── TB_VitalPlus.pdf             fehlerfreie Fassung der synthetischen TB (93 Seiten)
-│   ├── TB_VitalPlus_fehlerhaft.pdf  Prüfobjekt: Fassung mit 13 eingebauten Fehlern („Exemplar V-17b")
+│   ├── TB_VitalPlus_fehlerhaft.pdf  Prüfobjekt: Fassung mit 13 eingebauten Fehlern („Exemplar V-17b“)
 │   ├── Fehlerprotokoll.md           Ground Truth: die 13 Fehler F01–F13 mit Ort, Fehlbild, Soll-Wert
 │   ├── kalkulation/
 │   │   ├── pipeline.py              Kalkulationsstrecke: Rohdaten → Rechnungsgrundlagen, Barwerte,
@@ -61,7 +61,7 @@ PDF-Text-Layer unsichtbar sind) sowie der Grafik-Tabellen-Abgleich.
 Gegen typische LLM-Schwächen ist das Notebook mehrfach abgesichert:
 strukturierte Antwortschemata, Grounding (gemeldete Wörter und Zahlen
 müssen wörtlich im Dokument stehen), Warnung-statt-Fehler-Semantik bei
-Unsicherheit – und beim Grafik-Abgleich eine **„blinde" Ablesung**: Das
+Unsicherheit – und beim Grafik-Abgleich eine **„blinde“ Ablesung**: Das
 Modell erhält nur das Seitenbild ohne die Soll-Werte, der Vergleich erfolgt
 anschließend deterministisch in Python. Kennt das Modell die Tabellenwerte,
 neigt es dazu, sie schlicht zu bestätigen (Verankerungseffekt) – in der
@@ -75,8 +75,8 @@ Erprobung übersah es so selbst eine um 50 % verfälschte Kurve.
 | Gesamtbefunde | 21 Fehler, 8 Warnungen | **0 Fehler**, 5 Warnungen |
 
 Neun der 13 Fehler findet bereits die deterministische Ebene; zwei Befunde
-(Vorzeichenfehler im Formelsatz, verfälschte Grafik-Kurve) sind
-ausschließlich über die bildbasierten Prüfschritte auffindbar. Die fünf
+(Vorzeichenfehler im Formelsatz, verfälschte Grafik-Kurve) sind nur über
+die bildbasierten Prüfschritte als Fehler klassifizierbar. Die fünf
 Warnungen der Gegenprobe sind Sichtungshinweise ohne Fehlercharakter.
 Der maßgebliche Lauf (Modell: `claude-sonnet-5`, Juli 2026) ist mitsamt
 Ausgaben im Notebook gespeichert und als JSON-Prüfbericht exportiert.
@@ -88,7 +88,8 @@ Ausgaben im Notebook gespeichert und als JSON-Prüfbericht exportiert.
    ```bash
    cd tb-validierung
    python -m venv .venv
-   .venv\Scripts\activate        # Windows; Linux/macOS: source .venv/bin/activate
+   # Windows (PowerShell/cmd):  .venv\Scripts\activate
+   # Linux/macOS (bash/zsh):    source .venv/bin/activate
    pip install -r requirements.txt
    ```
 
@@ -105,7 +106,7 @@ Ausgaben im Notebook gespeichert und als JSON-Prüfbericht exportiert.
 ## Nutzung
 
 **Prüfen (Standardfall):** `validierungsnotebook/TB_Validierung.ipynb`
-öffnen und von oben nach unten ausführen („Run All"). In der
+öffnen und von oben nach unten ausführen („Run All“). In der
 Konfigurationszelle lassen sich Prüfobjekt (`TB_PDF_PFAD`), Referenzquellen
 und Modell umstellen; standardmäßig wird die fehlerhafte Fassung geprüft.
 Der Antwort-Cache (`llm_cache.json`) macht Wiederholungsläufe kostenlos.
@@ -116,16 +117,19 @@ Der Antwort-Cache (`llm_cache.json`) macht Wiederholungsläufe kostenlos.
 > `synthetische-tb`). Bei einem frischen Lauf zeigen die Ausgaben die
 > aktuellen Pfade.
 
-**Reproduzieren (vollständige Kette, optional):**
+**Reproduzieren (vollständige Kette, optional):** Alle Schritte aus dem
+Ordner `synthetische-tb/` heraus:
 
 1. `python kalkulation/pipeline.py` – erzeugt Rechnungsgrundlagen,
-   LaTeX-Tabellen (`tex/gen/`) und Kontroll-CSVs (`out/`); benötigt die
-   BaFin-Rohdaten (siehe unten)
-2. `tex/TB_VitalPlus_main.tex` dreimal mit `pdflatex` kompilieren
-   (Inhaltsverzeichnis, Querverweise, Blattzählung)
+   LaTeX-Tabellen (`tex/gen/`) und Kontroll-CSVs (`kalkulation/out/`);
+   benötigt die BaFin-Rohdaten (siehe unten)
+2. im Ordner `tex/`: `pdflatex TB_VitalPlus_main.tex` dreimal ausführen
+   (Inhaltsverzeichnis, Querverweise, Blattzählung; `pdflatex` muss im
+   `tex/`-Ordner laufen, da die Quellen relative `\input`-Pfade nutzen)
 3. `python kalkulation/erzeuge_fehlervariante.py` – erzeugt
    `tex_fehlerhaft/` mit den 13 Fehlern
-4. `tex_fehlerhaft/TB_VitalPlus_main.tex` dreimal kompilieren
+4. im Ordner `tex_fehlerhaft/`: `pdflatex TB_VitalPlus_main.tex` dreimal
+   ausführen
 5. `python kalkulation/erzeuge_datenbank.py` – baut die
    SQLite-Referenzdatenbank neu
 6. Notebook ausführen
@@ -133,20 +137,23 @@ Der Antwort-Cache (`llm_cache.json`) macht Wiederholungsläufe kostenlos.
 ## Datenherkunft und Grenzen
 
 - **Alle Inhalte sind synthetisch.** Die TB gehört zum fiktiven Tarif
-  „VitalPlus" der fiktiven „Feldafinger Brandkasse (FFBK)"; sämtliches
+  „VitalPlus“ der fiktiven „Feldafinger Brandkasse (FFBK)“; sämtliches
   Zahlenwerk entsteht deterministisch aus der Kalkulationspipeline.
 - **BaFin-Rohdaten sind nicht enthalten.** Die Pipeline stützt sich auf
   öffentlich verfügbare Veröffentlichungen der BaFin
   (PKV-Kopfschadenstatistik, Beobachtungsjahr 2022; PKV-Sterbetafel 2025)
   sowie eine fiktive Stornotafel. Für eine Neu-Kalkulation sind diese
   Dateien lokal im (unversionierten) Ordner `synthetische-tb/rohdaten/`
-  abzulegen (Unterordner `Kopfschäden/`, `Sterbewahrscheinlichkeiten/`,
-  `Stornowahrscheinlichkeiten/`). Notebook, Fehlervariante und
+  abzulegen – erwartet werden
+  `Kopfschäden/PKV_Kopfschadenstatistik_2022_Profile.csv`,
+  `Sterbewahrscheinlichkeiten/PKV_Sterbetafel_2025.csv` und
+  `Stornowahrscheinlichkeiten/storno2.csv` (die fiktive Stornotafel ist als
+  Werteverlauf in Anlage 2.2 der TB dokumentiert). Notebook, Fehlervariante und
   Datenbank-Erzeugung funktionieren auch ohne die Rohdaten.
 - **LLM-Prüfungen sind probabilistisch.** Sie können Befunde übersehen oder
   unzutreffende Hinweise erzeugen; ein unauffälliger Prüfbericht ist kein
   Nachweis der Fehlerfreiheit. Die fehlerhafte Referenzfassung dient
-  deshalb als dauerhafter Prüfstand („Validierung des Validators"): Jede
+  deshalb als dauerhafter Prüfstand („Validierung des Validators“): Jede
   Änderung an Modell oder Prüfregeln ist daran erneut zu messen.
 - Das Werkzeug ist eine unterstützende, vorbereitende Prüfung – es ersetzt
   weder die aktuarielle Durchsicht noch die Prüfung durch den Treuhänder.

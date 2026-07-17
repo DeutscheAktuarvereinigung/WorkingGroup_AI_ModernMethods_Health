@@ -1,6 +1,7 @@
 # PKV-Limitierungstool
 
-Streamlit-Anwendung fuer Bestandsanalyse und Limitierungsrechnung in der PKV.
+Streamlit-Anwendung fuer Bestandsanalyse und Limitierungsrechnung in der
+privaten Krankenversicherung (PKV).
 
 > Teil des Repositories der DAV-Arbeitsgruppe "Kuenstliche Intelligenz und
 > moderne Methoden in der Krankenversicherung" (siehe [Haupt-README](../README.md)).
@@ -14,7 +15,8 @@ Stand: 2026-04-16
 Das Tool unterstuetzt zwei zentrale Aufgaben:
 
 1. Analyse von Beitragsanpassungen im Bestand
-2. Simulation von Limitierungsregeln inkl. RfB-Bedarfsrechnung
+2. Simulation von Limitierungsregeln inkl. Bedarfsrechnung fuer die
+   Rueckstellung fuer Beitragsrueckerstattung (RfB)
 
 Kernfunktionen:
 
@@ -76,7 +78,7 @@ Die Sidebar bietet drei Modi:
 
 - Mock-Daten (lokaler Pfad), Default `./output_daten`
 - CSV-Upload (3 Dateien)
-- Snowflake-Schema über die aktive Snowflake-Session
+- Snowflake-Schema ueber die aktive Snowflake-Session
 
 Erwartete Dateien:
 
@@ -171,7 +173,7 @@ Referenzierte `betrag_spalte`- und `filter_spalten`-Werte muessen im Bestand vor
 
 ## Bedienung in der App
 
-## Tab 1: Bestandsanalyse
+### Tab 1: Bestandsanalyse
 
 Bereitgestellte Auswertungen:
 
@@ -187,7 +189,7 @@ Filterlogik:
 - Standardmaessig arbeitet die Analyse auf dem geladenen Gesamtbestand
 - Nach Klick auf Filter anwenden wird mit der gesetzten UND/ODER-Logik fuer Prozent- und Euro-Grenzen gefiltert
 
-## Tab 2: Mittelkonfiguration
+### Tab 2: Mittelkonfiguration
 
 Bereitgestellte Funktionen:
 
@@ -198,7 +200,7 @@ Bereitgestellte Funktionen:
 - Berechtigungsfilter, z. B. fuer ZU10 mit `tarifart == voll` und `alter >= 65`
 - Validierung der Konfiguration gegen den geladenen Bestand
 
-## Tab 3: Limitierungsrechnung
+### Tab 3: Limitierungsrechnung
 
 Bereitgestellte Funktionen:
 
@@ -290,10 +292,16 @@ app.py                        # Einstiegspunkt Streamlit
 app/pages/                    # UI-Logik je Tab
 services/                     # Fachlogik (Import, Analyse, Limitierung)
 ui/theme.py                   # Farben, Plot-Layout, CSS-Theme
+tests/                        # pytest-Suite fuer die Fachlogik
+docs/                         # fachliche Detail-Doku (Mittelquellen)
 mock_daten_erzeugen.py        # Generator fuer Testdaten
-output_daten/                 # Beispiel-/Mock-Daten
+pkv_sterbetafel.csv           # Eingabedatei des Generators
+output_daten/                 # erzeugte Mock-Daten (gitignored)
+.streamlit/config.toml        # Streamlit-Serverkonfiguration
 Dockerfile                    # Container-Setup
-requirements.txt              # Python-Abhaengigkeiten
+requirements.txt              # Python-Abhaengigkeiten (lokal/Docker)
+environment.yml               # Conda-Env fuer Streamlit in Snowflake
+pyproject.toml                # pytest-Konfiguration
 ```
 
 ## Performance- und Betriebs-Hinweise
@@ -325,7 +333,7 @@ requirements.txt              # Python-Abhaengigkeiten
 
 Moegliche naechste Schritte:
 
-- Unit-Tests fuer Kernfunktionen in services/
+- Ausbau der bestehenden Testabdeckung (tests/) um weitere Randfaelle
 - Fachliche Parametrisierung ueber Konfigurationsdateien
 - Deployment-Pipeline (z. B. Container Registry + App Service)
 - Rollen-/Rechtekonzept fuer fachliche Freigaben
