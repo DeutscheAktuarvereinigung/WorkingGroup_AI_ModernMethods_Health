@@ -1,5 +1,5 @@
 ---
-applyTo: "services/**/*.py"
+applyTo: "limitierungstool/services/**/*.py"
 description: "Use when: editing business logic for limitierung, barwertfaktoren, sensitivitaet, optimierung, and data loading in services/."
 ---
 

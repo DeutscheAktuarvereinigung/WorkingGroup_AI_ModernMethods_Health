@@ -1,5 +1,5 @@
 ---
-applyTo: "{app.py,app/pages/**/*.py,ui/**/*.py}"
+applyTo: "{limitierungstool/app.py,limitierungstool/app/pages/**/*.py,limitierungstool/ui/**/*.py}"
 description: "Use when: editing Streamlit UI, page rendering, sidebar filters, charts, and theme behavior."
 ---
 
