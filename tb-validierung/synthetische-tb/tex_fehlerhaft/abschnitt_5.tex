@@ -1,0 +1,160 @@
+\section{Ermittlung der Alterungsrückstellung}\label{sec:ar}
+
+Dieser Abschnitt regelt die tarifliche Alterungsrückstellung, die
+Bilanzdeckungsrückstellung, die Zusatzrückstellungen sowie den
+Übertragungswert.
+
+\subsection{Tarifliche Alterungsrückstellung}\label{sec:tarifar}
+
+Die Alterungsrückstelung wird prospektiv als Differenz des Barwerts
+der künftigen Leistungen und des Barwerts der künftigen Beiträge
+ermittelt (\S\,341f HGB, \S\,3 KVAV; derselbe Rechnungszins, dieselbe
+Ausscheideordnung und dieselben Kopfschäden wie für die
+Beitragsberechnung). \textbf{Festlegung:} Die Zuschläge $\Omega_x$ und
+$\gamma_x$ werden in der Rückstellungsbewertung mit der Stufe des
+\emph{erreichten} Alters angesetzt (Stufenwechsel zum Alter~65
+entsprechend dem tatsächlichen Wegfall der kostenbedingten Zuschläge),
+während die Beitragsformel~\eqref{eq:brutto} die Stufe des
+Eintrittsalters verwendet; der hieraus resultierende Sprung der
+Rückstellung beim Übergang vom Alter 64 zum Alter 65 wird im Beispiel
+des Anhangs~5 ausgewiesen. Für eine versicherte Person mit
+erreichtem Alter $x$ und monatlichem Bruttobeitrag $b$ (ohne
+gesetzlichen Beitragszuschlag und ohne Risikozuschläge) beträgt die
+(gezillmerte) Alterungsrückstellung
+\begin{equation}
+V_x(b) = G\cdot A_x
+- \bigl[\,12\cdot\bigl(1-(\sigma+\Omega_x)\bigr)\cdot b + \gamma_x\,\bigr]
+\cdot a_x,
+\label{eq:ar}
+\end{equation}
+wobei
+\begin{itemize}\itemsep1pt
+  \item $G\cdot A_x$ den Barwert der künftigen Leistungen (EUR),
+  \item $12\,(1-(\sigma+\Omega_x))\,b - \gamma_x$ den Jahresbetrag des
+        Beitrags nach Abzug der laufenden Zuschläge
+        (\glqq Zillmerprämie\grqq),
+  \item $a_x$ den Rentenbarwert sowie $\Omega_x$ und $\gamma_x$ die
+        Zuschläge zum erreichten Alter
+\end{itemize}
+bezeichnen. Für den Neuzugang mit Eintrittsalter $x_e$ und
+Tarifbeitrag $b = b_{x_e}$ gilt unmittelbar nach
+Gleichung~\eqref{eq:brutto}
+$V_{x_e}(b_{x_e}) = -\,\alpha_{x_e}\cdot b_{x_e}$ (negativer
+Anfangswert in Höhe der Zillmerkosten). Kinder und Jugendliche bilden
+keine Alterungsrückstellung. Einmalbeträge (Limitierung, Gutschriften)
+erhöhen die Alterungsrückstellung unmittelbar. Ein Beispiel für die
+Entwicklung der Alterungsrückstellung enthält Anhang~\ref{sec:anhang5}.
+
+Die jährliche Fortschreibung folgt aus Gleichung~\eqref{eq:ar} als
+Rekursion
+\begin{equation}
+V_{x+1}(b) = \frac{P^{Z}_x - G\,k_x + V_x(b)}{v\cdot\bigl(1-(q+w)_x\bigr)},
+\qquad P^{Z}_x = 12\cdot\bigl(1-(\sigma+\Omega_x)\bigr)\cdot b - \gamma_x,
+\label{eq:arrek}
+\end{equation}
+wobei $P^{Z}_x$ die Zillmerprämie (Jahresbetrag des Beitrags nach Abzug
+der laufenden Zuschläge), $G\,k_x$ den rechnungsmäßigen Kopfschaden und
+der Nenner $v\,(1-(q+w)_x) = DQ_x$ die versicherungsmathematische
+Aufzinsung einschließlich der Vererbung der Rückstellungen der durch
+Tod und Storno Ausscheidenden bezeichnet (Sterblichkeits- und
+Stornogewinne verbleiben rechnungsmäßig im Kollektiv). Die Rekursion
+gilt innerhalb konstanter Zuschlagsstufen; am Übergang vom Alter 64
+zum Alter 65 ist die Rückstellung nach Gleichung~\eqref{eq:ar} mit den
+Zuschlägen des erreichten Alters neu anzusetzen (siehe die obige
+Festlegung).
+
+\subsection{Bilanzdeckungsrückstellung}\label{sec:bilanzar}
+
+Für den Bilanzstichtag 31.12. wird die Alterungsrückstellung als
+arithmetisches Mittel der Werte zum letzten und nächsten Jahrestag
+angesetzt (\S\,18 KVAV; Gleichverteilung der Jahrestage unterstellt).
+Hierzu werden die gemittelten Barwerte
+\begin{equation}
+A_{x+1/2} = \tfrac{1}{2}\bigl(A_x + A_{x+1}\bigr),
+\qquad
+a_{x+1/2} = \tfrac{1}{2}\bigl(a_x + a_{x+1}\bigr),
+\qquad A_{111} := 0,\; a_{111} := 0,
+\label{eq:halbbarwerte}
+\end{equation}
+verwendet (Anlage~5.2, Abschnitt~\ref{sec:anlage523}); die
+Bilanzdeckungsrückstellung einer versicherten Person ergibt sich aus
+Gleichung~\eqref{eq:ar} mit $A_{x+1/2}$ und $a_{x+1/2}$ anstelle von
+$A_x$ und $a_x$. Ergibt die Aufrechnung negativer gegen positive
+Rückstellungen über den Bestand einen negativen Wert, wird in der
+Bilanz Null angesetzt (\S\,25 Abs.\,5 RechVersV).
+
+\textbf{Nachweis nach \S\,8 Abs.\,3 KVAV:} Die gezillmerte
+Alterungsrückstellung je Eintrittsalter ist spätestens ab dem
+\MaxNegM.~Versicherungsjahr (Männer) bzw. \MaxNegF.~Versicherungsjahr
+(Frauen) nichtnegativ (Anlage~\ref{sec:anlage522});
+damit ist die Gesamtalterungsrückstellung eines Zugangsjahrgangs
+höchstens vier Jahre und jede Einzelalterungsrückstellung weder länger
+als fünfzehn Jahre noch länger als die Hälfte der tariflich
+vorgesehenen künftigen Vertragsdauer negativ.
+
+\subsection{Zusatzrückstellung aus dem gesetzlichen Beitragszuschlag}
+\label{sec:zusatzrueckstellung}
+
+Der gesetzliche Beitragszuschlag (Abschnitt~\ref{sec:gz}) wird
+individuell in einer Zusatzrückstellung angesammelt (\S\,149, \S\,150
+Abs.\,1 VAG). Da künftige Entnahmen nicht statistisch feststehen, wird
+die Zusatzrückstellung retrospektiv fortgeschrieben:
+\begin{equation}
+V^{GZ}_{m+1}
+= \frac{\bigl(V^{GZ}_{m} + C_m - E_m\bigr)\cdot(1+i)}{1-q_{x_e+m}},
+\qquad V^{GZ}_{0} = 0,
+\label{eq:gz-rueckstellung}
+\end{equation}
+wobei $C_m = 0{,}1\cdot 12\,b$ den Jahresbetrag des Zuschlags
+(für $22 \le x_e+m \le 60$, sonst 0; Abschnitt~\ref{sec:gz}), $E_m$
+die Entnahmen zur Beitragsermäßigung (ab Alter 65; vorher 0) und
+$q_{x_e+m}$ die rechnungsmäßige Sterbewahrscheinlichkeit bezeichnen.
+\textbf{Festlegung:} Die Vererbung erfolgt vereinfachend nur über die
+Sterblichkeit; bei Storno wird die Zusatzrückstellung -- mangels
+Übertragungswertanspruchs in der alten Welt -- zugunsten des
+verbleibenden Bestandes vererbt und hierfür im Rahmen der jährlichen
+Überschussanalyse gesondert ausgewiesen (eine tafelmäßige Aufteilung
+des Stornos nach Zielsystem GKV/PKV liegt nicht vor; der Ansatz ohne
+Storno-Vererbung in Gleichung~\eqref{eq:gz-rueckstellung} ist
+vorsichtig).
+
+\textbf{Weitere Zusatzrückstellungen nach \S\,150 VAG:}
+\begin{itemize}\itemsep2pt
+  \item \emph{Zuschreibung von Zinserträgen (\S\,150 Abs.\,1 und 2
+        VAG):} Der Rückstellung zur Beitragsermäßigung im Alter werden
+        jährlich 90\,\% des rechnungsmäßig ermittelten Überzinses
+        gutgeschrieben:
+        \begin{equation}
+        Z_t = 0{,}9\cdot(r_t - i)\cdot \bar{V}_t,
+        \label{eq:ueberzins}
+        \end{equation}
+        wobei $r_t$ die maßgebliche Kapitalanlagerendite des
+        Geschäftsjahres $t$, $i$ den Rechnungszins und $\bar{V}_t$ die
+        maßgebliche mittlere positive Alterungsrückstellung des
+        Vertrags bezeichnen. Für Versicherte, die das 65.~Lebensjahr
+        vollendet haben, werden die Beträge nach Maßgabe des \S\,150
+        Abs.\,2 und 3 VAG zur Beitragsermäßigung eingesetzt bzw.
+        (über 80-Jährige) jährlich ausgekehrt
+        (Abschnitt~\ref{sec:beitragsermaessigung}); der Auskehrbetrag
+        entspricht der Zuschreibung $Z_t$ des Geschäftsjahres.
+  \item \emph{Rückstellung für erfolgsunabhängige Beitragsrückerstattung
+        (\S\,150 Abs.\,4 VAG):} Ihr werden jährlich die vereinnahmten
+        euBR-Zuschläge zugeführt und die ausgezahlten
+        erfolgsunabhängigen Beitragsrückerstattungen entnommen:
+        $\Delta R^{\mathrm{euBR}}_t = \sum \gamma^{\mathrm{euBR}}
+        - \text{Auszahlungen}_t$ (Summation über die beitragspflichtigen
+        Versicherten; Nachweis der Angemessenheit der
+        $\gamma^{\mathrm{euBR}}$-Sätze in
+        Abschnitt~\ref{sec:eubr}).
+\end{itemize}
+
+\subsection{Übertragungswert}\label{sec:uew}
+
+Der Tarif gehört zur alten Welt (Vertragsabschlüsse vor dem
+01.01.2009). Ein Anspruch auf Mitgabe eines Übertragungswertes nach
+\S\,146 Abs.\,1 Nr.\,5 VAG i.\,V.\,m. \S\,14 KVAV besteht nicht;
+bei einem Wechsel in einen Tarif der neuen Welt beim selben
+Unternehmen wird die Alterungsrückstellung nach
+Abschnitt~\ref{sec:umstufung} angerechnet und der ab dem Wechsel
+aufgebaute Teil gemäß \S\,14 Abs.\,4 KVAV gesondert geführt
+(Dokumentation in der TB des Zieltarifs).

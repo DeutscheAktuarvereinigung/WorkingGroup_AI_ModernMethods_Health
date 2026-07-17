@@ -1,5 +1,5 @@
 ---
-applyTo: "tests/**/*.py"
+applyTo: "limitierungstool/tests/**/*.py"
 description: "Use when: adding or updating pytest tests for service logic, data loading, and limitierungs rules."
 ---
 

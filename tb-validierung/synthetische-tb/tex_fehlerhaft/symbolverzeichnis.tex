@@ -1,0 +1,64 @@
+Die folgende Übersicht erklärt sämtliche in dieser TB verwendeten Symbole.
+
+\begin{center}\small
+\begin{longtable}{@{}lp{13.5cm}@{}}
+\toprule
+Symbol & Bedeutung \\
+\midrule
+\endfirsthead
+\toprule
+Symbol & Bedeutung \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+$x$ & versicherungstechnisches Alter (Kalenderjahr minus Geburtsjahr) \\
+$x_e$ & Eintrittsalter \\
+$m$ & abgelaufene Versicherungsdauer in Jahren \\
+$\omega$ & Schlussalter der Rechnungsgrundlagen; $\omega = 110$ \\
+$i$ & Rechnungszins der Beobachtungseinheit (Anlage~2.1) \\
+$v$ & Diskontierungsfaktor, $v = 1/(1+i)$ \\
+$q_x$ & einjährige Sterbewahrscheinlichkeit einer $x$-jährigen Person \\
+$w_x$ & einjährige Stornowahrscheinlichkeit einer $x$-jährigen Person \\
+$(q+w)_x$ & Ausscheidewahrscheinlichkeit, $(q+w)_x = q_x + w_x$ \\
+$l_x$ & Anzahl der Verbleibenden einer fiktiven Ausgangsgesamtheit im Alter $x$ \\
+$D_x$ & diskontierte Lebende, $D_x = v^x\cdot l_x$ (informatorisch) \\
+$K_x$ & rechnungsmäßiger Kopfschaden des Alters $x$ (EUR p.\,a.) \\
+$G$ & Grundkopfschaden der Beobachtungseinheit (EUR p.\,a.), $G = K_{40}$ \\
+$k_x$ & normierter Kopfschaden (Profilwert), $k_x = K_x / G$, $k_{40}=1$ \\
+$\tilde{x}$ & Monotonisierungsalter der Profile (ab $\tilde{x}$ monoton nicht fallend; Anlage~\ref{sec:anlage233}) \\
+$K_x^{\mathrm{LB}}$ & beobachteter Teilkopfschaden des Leistungsbereichs LB \\
+$K_x^{S}$ & beobachtete Schwangerschafts- und Mutterschaftskosten (S-Kosten) je Frau \\
+$u_x$ & geschlechtsunabhängige Umlage der S-Kosten je versicherte Person \\
+$n_x^{M}, n_x^{W}$ & Bestände (Personenjahre) Männer bzw. Frauen des Alters $x$ \\
+$\bar{K}_{\mathrm{Ki}}$ & bestandsgewichteter mittlerer Kopfschaden der Kinder (0--15, geschlechtsunabhängig) \\
+$\bar{K}^{M}_{\mathrm{Ju}}, \bar{K}^{F}_{\mathrm{Ju}}$ & bestandsgewichtete mittlere Kopfschäden der männlichen bzw. weiblichen Jugendlichen (16--20); $\bar{K}_{\mathrm{Ju}}$ ohne Index bezeichnet das bestandsgewichtete Mittel beider \\
+$A_x$ & Leistungsbarwert in Profileinheiten (Abschnitt~\ref{sec:grundwerte}) \\
+$a_x$ & Rentenbarwert (Barwert der vorschüssigen Zahlung 1 p.\,a.) \\
+$A_{x+1/2}, a_{x+1/2}$ & gemittelte Barwerte für die Bilanzdeckungsrückstellung \\
+$P_x$ & Jahresnettobeitrag (EUR p.\,a.) \\
+$b_x$ & tariflicher monatlicher Bruttobeitrag (Beitragsrate, EUR/Monat) \\
+$\sigma$ & Sicherheitszuschlag (Prozentsatz des Bruttobeitrags) \\
+$\Omega_x$ & Zuschlag für Standard- und Basistarif (Prozentsatz des Bruttobeitrags) \\
+$\alpha_u, \alpha_m, \rho, \beta$ & Kostensätze für unmittelbare/mittelbare Abschlusskosten, Schadenregulierungs- und sonstige Verwaltungskosten (Prozent des Bruttobeitrags) \\
+$\Delta_x$ & Summe der prozentualen Kostensätze: $\alpha_u + \alpha_m + \rho + \beta$ für $x \le 64$, ab Alter 65 ohne $\alpha_u$ \\
+$\gamma_x$ & altersunabhängiger Zuschlag (EUR p.\,a.), Summe aus Kostenzuschlag und euBR-Zuschlag \\
+$\gamma^{\mathrm{euBR}}$ & Zuschlag für die erfolgsunabhängige Beitragsrückerstattung (EUR p.\,a.) \\
+$\gamma^{K}$ & altersunabhängiger Zuschlag der Kinder und Jugendlichen (EUR p.\,a.) \\
+$RZ$ & individueller Risikozuschlagsfaktor (Prozentsatz des Bruttobeitrags) \\
+$x_\gamma$ & Gamma-Alter (durchschnittliches Bestandsalter) zur Umrechnung prozentualer in absolute Kostenzuschläge \\
+$\alpha_x$ & Zillmersatz in Vielfachen des Monatsbeitrags \\
+$V_{x}(b)$ & gezillmerte Alterungsrückstellung im Alter $x$ bei monatlichem Beitrag $b$ (EUR) \\
+$V^{GZ}_{m}$ & Zusatzrückstellung aus dem gesetzlichen Beitragszuschlag nach $m$ Jahren (EUR) \\
+$Z_{x_e,m}$ & monatlicher Zahlbetrag im Alter $x_e+m$ \\
+$b^{E}_x$ & monatliche Beitragsermäßigung aus einem Einmalbetrag $E$ \\
+$S^{\mathrm{erf}}, S^{\mathrm{kalk}}$ & erforderliche bzw. kalkulierte Versicherungsleistungen (Abschnitt~\ref{sec:af}) \\
+$G^{(1)}, G^{(2)}, G^{(3)}$ & tatsächliche Grundkopfschäden der letzten drei Beobachtungszeiträume \\
+$G^{\mathrm{ext}}, G^{\mathrm{rech}}$ & extrapolierter bzw. rechnungsmäßiger Grundkopfschaden \\
+$AF^{L}, AF^{S}$ & auslösender Faktor der Leistungen bzw. der Sterblichkeit \\
+$A^{\mathrm{erf}}_x, A^{\mathrm{kalk}}_x$ & Leistungsbarwerte ohne Storno mit aktueller PKV-Sterbetafel bzw. mit rechnungsmäßigen Sterbewahrscheinlichkeiten \\
+\end{longtable}
+\end{center}
+% longtable erhoeht den Tabellenzaehler auch ohne Caption -- zuruecksetzen,
+% damit die nummerierten Tabellen bei "Tabelle 1" beginnen
+\addtocounter{table}{-1}

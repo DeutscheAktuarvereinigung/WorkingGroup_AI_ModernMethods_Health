@@ -1,0 +1,164 @@
+\section{Berechnung der Beiträge für den Neuzugang}\label{sec:beitraege}
+
+Die Beitragsberechnung folgt den Formeln des Abschnitts~A der Anlage~1
+zur KVAV (\S\,10 Abs.\,1 KVAV) in der nachfolgend dokumentierten
+rekursiven Darstellung. Da der Tarif für das Neugeschäft geschlossen
+ist (Abschnitt~\ref{sec:tarifdarstellung}), dienen die
+Neuzugangsbeiträge als Tarifbeiträge der Bestandsführung, der
+Beitragsanpassung (Abschnitt~\ref{sec:bap}) und individuellen
+Tarifänderungen (Abschnitt~\ref{sec:tarifaenderung}). Das
+Höchsteintrittsalter des Tarifs betrug 75~Jahre; Tarifbeiträge für
+höhere Alter werden zu tariftechnischen Zwecken geführt.
+
+\subsection{Versicherungstechnische Grundwerte}\label{sec:grundwerte}
+
+Die Barwerte werden je Beobachtungseinheit (Männer, Frauen) rekursiv
+aus den Rechnungsgrundlagen des Abschnitts~\ref{sec:rechnungsgrundlagen}
+berechnet. Der \textbf{Leistungsbarwert} $A_x$ (in Einheiten des
+Grundkopfschadens, d.\,h. in Profileinheiten) und der
+\textbf{Rentenbarwert} $a_x$ (Barwert einer lebenslang vorschüssig
+gezahlten Rente der Höhe 1 p.\,a.) erfüllen die Rekursionen
+\begin{align}
+A_{110} &= k_{110}, &
+A_x &= k_x + DQ_x\cdot A_{x+1}, \qquad x = 109,\dots,21,
+\label{eq:rekA}\\
+a_{110} &= 1, &
+a_x &= 1 + DQ_x\cdot a_{x+1}, \qquad x = 109,\dots,21,
+\label{eq:reka}
+\end{align}
+wobei $k_x$ den Profilwert gemäß Gleichung~\eqref{eq:profil} und
+$DQ_x$ die diskontierte Übergangswahrscheinlichkeit gemäß
+Gleichung~\eqref{eq:dq} bezeichnen. Leistungen und Beiträge werden
+rechnungsmäßig jeweils zu Jahresbeginn fällig (vorschüssige
+Betrachtung). In Summenschreibweise gilt gleichwertig
+\begin{equation}
+A_x = \sum_{t=0}^{110-x} v^t \cdot {}_{t}p_x \cdot k_{x+t},
+\qquad
+a_x = \sum_{t=0}^{110-x} v^t \cdot {}_{t}p_x,
+\qquad
+{}_{t}p_x = \prod_{s=0}^{t-1}\bigl(1-(q+w)_{x+s}\bigr),
+\label{eq:barwertsumme}
+\end{equation}
+wobei ${}_{t}p_x$ die $t$-jährige Verbleibewahrscheinlichkeit einer
+$x$-jährigen Person bezeichnet. Der Leistungsbarwert in EUR ergibt sich
+durch Multiplikation mit dem Grundkopfschaden: $G\cdot A_x$. Die
+Barwerte enthält Anlage~\ref{sec:anlage311}; die
+Rundungskonventionen des Abschnitts~\ref{sec:rundung} gelten
+schrittweise in den Rekursionen.
+
+\subsection{Jahresnettobeiträge}\label{sec:nettobeitraege}
+
+Der Jahresnettobeitrag ergibt sich für Erwachsene nach dem
+Äquivalenzprinizip (Barwert der Leistungen = Barwert der Beiträge) zu
+\begin{equation}
+P_x = \frac{G\cdot A_x}{a_x},
+\qquad x = 21,\dots,110,
+\label{eq:netto}
+\end{equation}
+wobei $G$ den Grundkopfschaden, $A_x$ den Leistungsbarwert in
+Profileinheiten und $a_x$ den Rentenbarwert bezeichnen ($x$ ist das
+Eintrittsalter; der Nettobeitrag bleibt bei unveränderten
+Rechnungsgrundlagen lebenslang konstant).
+
+Kinder und Jugendliche zahlen die natürliche Prämie (\S\,10 Abs.\,4
+KVAV); ihr Jahresnettobeitrag entspricht dem mittleren Kopfschaden der
+Altersgruppe gemäß Gleichung~\eqref{eq:kkinder}. Die Jugendlichen werden
+dabei geschlechtsabhängig unterschieden:
+\begin{equation}
+P^{\mathrm{Ki}} = \bar{K}_{\mathrm{Ki}},
+\qquad
+P^{\mathrm{Ju},M} = \bar{K}^{M}_{\mathrm{Ju}},
+\qquad
+P^{\mathrm{Ju},F} = \bar{K}^{F}_{\mathrm{Ju}}.
+\label{eq:pkinder}
+\end{equation}
+
+\subsection{Tarifliche monatliche Beitragsraten}\label{sec:beitragsraten}
+
+Der tarifliche monatliche Bruttobeitrag der Erwachsenen
+(Einzelversicherung) beträgt
+\begin{equation}
+b_x = \frac{G\cdot A_x + \gamma_x\cdot a_x}
+           {12\cdot\bigl(1-(\sigma+\Omega_x)\bigr)\cdot a_x - \alpha_x},
+\qquad x = 21,\dots,110,
+\label{eq:brutto}
+\end{equation}
+wobei
+\begin{itemize}\itemsep1pt
+  \item $G\cdot A_x$ der Leistungsbarwert in EUR,
+  \item $\gamma_x$ der altersunabhängige Zuschlag gemäß
+        Gleichung~\eqref{eq:gammasumme} (Stufe $x \le 64$ bzw.
+        $x \ge 65$ nach dem Eintrittsalter),
+  \item $\sigma$ der Sicherheitszuschlag gemäß
+        Gleichung~\eqref{eq:sigma},
+  \item $\Omega_x$ der Zuschlag gemäß Gleichung~\eqref{eq:omegaz},
+  \item $\alpha_x$ der Zillmersatz gemäß Gleichung~\eqref{eq:zillmer}
+\end{itemize}
+ist. Die Formel folgt aus der Äquivalenzgleichung
+\begin{equation}
+12\,b_x\,a_x = G\,A_x + \gamma_x\,a_x
++ 12\,(\sigma+\Omega_x)\,b_x\,a_x + \alpha_x\,b_x,
+\label{eq:aequivalenz}
+\end{equation}
+also Beitragsbarwert = Leistungsbarwert + Barwert der absoluten Zuschläge
++ Barwert der prozentualen Zuschläge + Zillmerkosten.
+
+Kinder und Jugendliche (keine Alterungsrückstellung, keine Zillmerung;
+$\Omega$ in der Stufe $x \le 64$; Jugendliche geschlechtsabhängig):
+\begin{equation}
+\begin{aligned}
+b^{\mathrm{Ki}} &= \frac{\bar{K}_{\mathrm{Ki}} + \gamma^{K}}
+{12\,\bigl(1-(\sigma+\Omega_{\le 64})\bigr)}, &
+b^{\mathrm{Ju},M} &= \frac{\bar{K}^{M}_{\mathrm{Ju}} + \gamma^{K}}
+{12\,\bigl(1-(\sigma+\Omega_{\le 64})\bigr)}, \\[2pt]
+b^{\mathrm{Ju},F} &= \frac{\bar{K}^{F}_{\mathrm{Ju}} + \gamma^{K}}
+{12\,\bigl(1-(\sigma+\Omega_{\le 64})\bigr)}. &&
+\end{aligned}
+\label{eq:bkinder}
+\end{equation}
+Die konkreten Beitragsraten der Kinder sowie der männlichen und
+weiblichen Jugendlichen sind in Anhang~\ref{sec:anhang3} ausgewiesen.
+
+Die Beitragsraten werden kaufmännisch auf 0{,}01~EUR gerundet und sind
+in Anhang~\ref{sec:anhang3} aufgeführt.
+\textbf{Eigenschaften des Beitragsverlaufs:} Die Beiträge sind im
+Eintrittsalter monoton nicht fallend, mit zwei systematisch bedingten
+Ausnahmen: In den höchsten Altern (ab etwa Alter~90) sind die Beiträge
+konstant bis auf Rundungsdifferenzen von wenigen Cent (höchstens
+0{,}06~EUR) aus den Rundungskonventionen des
+Abschnitts~\ref{sec:rundung}; bei den Männern und Frauen kann der
+Beitrag vom Eintrittsalter 64 zum Eintrittsalter 65 geringfügig sinken,
+da ab dem Alter 65 die kostenbedingten Zuschläge $\alpha_u$ und die
+Standardtarif-Komponente von $\Omega$ entfallen. Beide Effekte stehen
+\S\,146 Abs.\,2 VAG nicht entgegen, da sie ausschließlich den
+(geschlossenen) Neuzugang betreffen.
+
+\subsection{Gesetzlicher Beitragszuschlag}\label{sec:gz}
+
+Auf den monatlichen Bruttobeitrag wird ab Beginn des Kalenderjahres
+nach der Vollendung des 21.~Lebensjahres bis zum Ende des
+Kalenderjahres, in dem das 60.~Lebensjahr vollendet wird, der
+gesetzliche Beitragszuschlag von 10\,\% gemäß \S\,149 VAG erhoben
+(Verwendung: Abschnitt~\ref{sec:zusatzrueckstellung}); dies entspricht
+den versicherungstechnischen Altern 22 bis 60. Der monatliche
+Zahlbetrag beträgt damit
+\begin{equation}
+Z_{x_e,m} = \begin{cases}
+(1 + 0{,}1 + RZ)\cdot b_{x_e} & 22 \le x_e+m \le 60,\\[2pt]
+(1 + RZ)\cdot b_{x_e} & \text{sonst},
+\end{cases}
+\label{eq:zahlbeitrag}
+\end{equation}
+wobei $x_e$ das Eintrittsalter, $m$ die abgelaufene Versicherungsdauer
+und $RZ$ einen etwaigen individuellen Risikozuschlagsfaktor
+(Abschnitt~\ref{sec:risikozuschlag}) bezeichnen. \textbf{Festlegung:}
+Bemessungsgrundlage des gesetzlichen Zuschlags ist der Tarifbeitrag
+$b_{x_e}$ ohne Risikozuschlag.
+
+\subsection{Risikozuschläge}\label{sec:risikozuschlag}
+
+Risikozuschläge für erhöhte Risiken (Vorerkrankungen, Beruf) werden als
+prozentualer Faktor $RZ$ auf den Bruttobeitrag erhoben. Die Bemessung
+im Einzelfall ist nicht Bestandteil dieser TB. Bei Beitragsanpassungen
+bleiben die Risikozuschlagsfaktoren unverändert
+(Abschnitt~\ref{sec:bap}).

@@ -6,6 +6,9 @@ user-invocable: true
 disable-model-invocation: false
 ---
 
+> Hinweis: Das Limitierungstool liegt seit der Repo-Umstrukturierung im Unterordner limitierungstool/. Alle Pfadangaben in diesem Dokument (services/, tests/, app/pages/, ui/, app.py) verstehen sich relativ zu limitierungstool/.
+
+
 # Limitierungs Regression
 
 Nutze diesen Skill fuer wiederkehrende Fachlogik-Aenderungen im PKV-Limitierungstool, insbesondere in services/ und den dazugehoerigen Tests.

@@ -8,6 +8,9 @@ user-invocable: true
 agents: []
 ---
 
+> Hinweis: Das Limitierungstool liegt seit der Repo-Umstrukturierung im Unterordner limitierungstool/. Alle Pfadangaben in diesem Dokument (services/, tests/, app/pages/, ui/, app.py) verstehen sich relativ zu limitierungstool/.
+
+
 You are the implementation agent for this PKV-Limitierungstool. Your job is to make focused code changes end-to-end, including validation and tests when fachliche logic changes.
 
 ## Scope

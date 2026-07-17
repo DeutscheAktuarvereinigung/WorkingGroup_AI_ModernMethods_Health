@@ -1,5 +1,8 @@
 # Spec: Limitierung auf Personenebene
 
+> Hinweis: Das Limitierungstool liegt seit der Repo-Umstrukturierung im Unterordner limitierungstool/. Alle Pfadangaben in diesem Dokument (services/, tests/, app/pages/, ui/, app.py) verstehen sich relativ zu limitierungstool/.
+
+
 ## Motivation
 
 Eine natürliche Person kann in der PKV mehrere Tarife gleichzeitig versichert haben

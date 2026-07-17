@@ -1,5 +1,8 @@
 # PKV-Limitierungstool: Projektweite Copilot Instructions
 
+> Hinweis: Das Limitierungstool liegt seit der Repo-Umstrukturierung im Unterordner limitierungstool/. Alle Pfadangaben in diesem Dokument (services/, tests/, app/pages/, ui/, app.py) verstehen sich relativ zu limitierungstool/.
+
+
 ## Zielbild
 - Liefere fachlich nachvollziehbare, testbare und stabile Aenderungen fuer Bestandsanalyse und Limitierungsrechnung.
 - Trenne strikt zwischen UI, Service-Logik und Datenvalidierung.

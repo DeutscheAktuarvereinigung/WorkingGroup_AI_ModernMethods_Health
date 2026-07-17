@@ -1,0 +1,102 @@
+% =====================================================================
+% ANHANGTEIL -- eigene Nummerierung (Anhang 3, Anhang 5),
+% Bezeichnungen analog zu den zugehoerigen Abschnitten
+% =====================================================================
+
+% ---------------------------------------------------------------------
+\setzeTeil{Anhang 3}
+\section{Tarifliche monatliche Beitragsraten}\label{sec:anhang3}
+
+Tarifbeiträge gemäß den Gleichungen~\eqref{eq:netto},
+\eqref{eq:brutto} und \eqref{eq:bkinder} (Einzelversicherung, ohne
+gesetzlichen Beitragszuschlag und ohne Risikozuschläge; Stand:
+Änderungsnr.~17, BAP 01/2025; Endalter der Tafel: 110).
+Höchsteintrittsalter des (geschlossenen) Tarifs: 75~Jahre; Werte
+darüber dienen tariftechnischen Zwecken.
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Beobachtungseinheit & $P$ (EUR p.\,a.) & $b$ (EUR/Monat) \\
+\midrule
+Kinder (0--15) & \KKinder & \BKinder \\
+männliche Jugendliche (16--20) & \KJugendM & \BJugendM \\
+weibliche Jugendliche (16--20) & \KJugendF & \BJugendF \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\input{gen/gen_anhang_3}
+
+% ---------------------------------------------------------------------
+\setzeTeil{Anhang 5}
+\setcounter{section}{4}
+\section{Beispielrechnung}\label{sec:anhang5}
+
+Die folgende Beispielrechnung vollzieht die Beitragsberechnung für
+eine \textbf{männliche Person mit Eintrittsalter $x_e = \BspAlter$}
+Schritt für Schritt nach. Alle Werte folgen aus den Anlagen dieser TB
+und den Rundungskonventionen des Abschnitts~\ref{sec:rundung}.
+
+\bigskip\noindent\textbf{Schritt 1: Rechnungsgrundlagen (Anlagen 2.1, 2.2 und 2.3.3)}
+\begin{align*}
+i &= \ZinsM\,\% \quad\Rightarrow\quad v = \tfrac{1}{1{,}027} = 0{,}973710\dots\\
+k_{\BspAlter} &= \Bspkx, \qquad
+K_{\BspAlter} = k_{\BspAlter}\cdot G^{M} = \Bspkx \cdot \GMann = \BspKx\ \text{EUR}\\
+q_{\BspAlter} &= \Bspqx, \qquad w_{\BspAlter} = \Bspwx\\
+DQ_{\BspAlter} &= v\cdot\bigl(1 - q_{\BspAlter} - w_{\BspAlter}\bigr) = \BspDQx
+\end{align*}
+
+\bigskip\noindent\textbf{Schritt 2: Barwerte (Anlage 3.1, Rekursionen
+\eqref{eq:rekA}/\eqref{eq:reka})}
+\begin{align*}
+A_{\BspAlter} &= k_{\BspAlter} + DQ_{\BspAlter}\cdot A_{44}
+= \Bspkx + \BspDQx\cdot\BspAxE = \BspAx\\
+a_{\BspAlter} &= 1 + DQ_{\BspAlter}\cdot a_{44}
+= 1 + \BspDQx\cdot\BspaxE = \Bspax
+\end{align*}
+
+\bigskip\noindent\textbf{Schritt 3: Jahresnettobeitrag (Gleichung \eqref{eq:netto})}
+\begin{equation*}
+P_{\BspAlter} = \frac{G^{M}\cdot A_{\BspAlter}}{a_{\BspAlter}}
+= \frac{\GMann\cdot\BspAx}{\Bspax} = \BspPx\ \text{EUR p.\,a.}
+\end{equation*}
+
+\bigskip\noindent\textbf{Schritt 4: Monatlicher Bruttobeitrag (Gleichung \eqref{eq:brutto})}
+
+\noindent Mit $\gamma_{\BspAlter} = \BspGamma$~EUR, $\sigma + \Omega = 5{,}7\,\%$
+und $\alpha_{\BspAlter} = \AlphaZ$:
+\begin{equation*}
+b_{\BspAlter}
+= \frac{\GMann\cdot\BspAx + \BspGamma\cdot\Bspax}
+       {12\cdot(1-0{,}057)\cdot\Bspax - 3{,}5}
+= \Bspbx\ \text{EUR/Monat}.
+\end{equation*}
+Der monatliche Zahlbetrag bis zum Alter 60 beträgt einschließlich des
+gesetzlichen Beitragszuschlags $1{,}1\cdot b_{\BspAlter}$
+(Gleichung~\eqref{eq:zahlbeitrag}).
+
+\bigskip\noindent\textbf{Schritt 5: Alterungsrückstellung (Gleichung \eqref{eq:ar})}
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Zeitpunkt & $V_{\BspAlter+m}(b_{\BspAlter})$ (EUR) \\
+\midrule
+Vertragsbeginn ($m=0$; $\approx -\alpha_{\BspAlter}\cdot b_{\BspAlter}$) & \BspVnull \\
+nach 5 Jahren & \BspVfuenf \\
+nach 10 Jahren & \BspVzehn \\
+nach 20 Jahren & \BspVzwanzig \\
+\bottomrule
+\end{tabular}
+\end{center}
+Der Anfangswert folgt aus Gleichung~\eqref{eq:ar}; die Identität
+$V_{x_e} = -\alpha_{x_e}\cdot b_{x_e}$ gilt wegen der kaufmännischen
+Rundung des Beitrags auf 0{,}01~EUR nur näherungsweise
+(Abschnitt~\ref{sec:rundung}). Die Rückstellung ist ab dem
+Versicherungsjahr $m = \BspNegM$ nichtnegativ; der Rückgang beim
+Übergang vom Alter 64 zum Alter 65 ($m = 21 \to 22$) beruht auf dem
+Stufenwechsel der Zuschläge (Festlegung in
+Abschnitt~\ref{sec:tarifar}). Der vollständige Verlauf der ersten
+30 Jahre (Endalter der Rückstellungsbewertung: 110):
+
+\input{gen/gen_anhang_5_ar}
