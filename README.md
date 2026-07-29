@@ -93,7 +93,7 @@ sodass sich die Ergebnisse ohne Python- oder R-Umgebung nachlesen lassen.
 ## Ansprechpartner
 
 Arbeitsgruppe „Künstliche Intelligenz und moderne Methoden in der
-Krankenversicherung“ (Ausschuss ADS/AI der DAV):
+Krankenversicherung“ (Ausschuss Krankenversicherung der DAV):
 
 - Simon Hatzesberger ([@simonhatzesberger](https://github.com/simonhatzesberger), simon.hatzesberger@gmail.com)
 - Daniel Hasler ([@DanielHustler](https://github.com/DanielHustler))
