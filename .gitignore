@@ -54,3 +54,17 @@ tb-validierung/synthetische-tb/tex_fehlerhaft/*.pdf
 
 # BaFin-Rohdaten (lokal zu beziehen, nicht versioniert)
 tb-validierung/synthetische-tb/rohdaten/
+
+# Eingangsdaten der Analyse-Notebooks (lokal zu beziehen, nicht versioniert)
+fallprognose-wiedereinweisung/data/*.csv
+praemienstruktur/data/*.xlsx
+
+# R / R Markdown
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+praemienstruktur/data_cache/
+praemienstruktur/praemienstruktur_files/
+praemienstruktur/praemienstruktur_cache/

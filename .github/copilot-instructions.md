@@ -1,6 +1,8 @@
 # PKV-Limitierungstool: Projektweite Copilot Instructions
 
 > Hinweis: Das Limitierungstool liegt seit der Repo-Umstrukturierung im Unterordner limitierungstool/. Alle Pfadangaben in diesem Dokument (services/, tests/, app/pages/, ui/, app.py) verstehen sich relativ zu limitierungstool/.
+>
+> Die weiteren Deliverables tb-validierung/, fallprognose-wiedereinweisung/ und praemienstruktur/ fallen nicht unter diese Instructions. Die beiden Analyse-Notebooks (hospital-readmission.ipynb, praemienstruktur.Rmd) werden bewusst unveraendert bereitgestellt und sind inhaltlich nicht zu bearbeiten.
 
 
 ## Zielbild

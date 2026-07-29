@@ -1,0 +1,820 @@
+---
+title: "Premium"
+author: "Jens Piontkowski, Stefan Nohl"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    toc: yes
+---
+
+
+# Zielsetzung
+
+
+In diesem Dokument wird die Prämienstruktur eines Krankenversicherungsportfolios analysiert und es werden eine Reihe von Modellen getestet, die diese Prämienstruktur nachbilden sollen. Ausgangspunkt ist ein anonymisierter Vertragsbestand eines spanischen Krankenversicherers, der verschiedene Produktlinien (Standard, Premium, International, Dental) sowie Informationen zu Alter, Geschlecht, Vertriebsweg und Vertragsart enthält.
+
+Ziel ist es zu zeigen, wie ein Datenbestand untersucht werden kann, der neben einer longitudinalen Komponente (dem Alter) noch mehrere diskrete Komponenten enthält. Ein solcher Datensatz tritt in der Krankenversicherung häufig auf, zum Beispiel bei Untersuchungen der eingetretenen Schäden.
+
+
+Dafür werden die folgenden Schritte durchgeführt:
+
+ - zunächst wird ein deskriptives Verständnis für die Bestandsstruktur und die Verteilung der Prämien gewonnen,
+- dadurch können Besonderheiten und Produktsegmente erkannt werden, die nicht explizit in den Daten enthalten sind 
+- darauf aufbauend werden einfache und verallgemeinerte Regressionsmodelle für die Prämienhöhe  formuliert, um zentrale Einflussfaktoren zu quantifizieren.  
+
+
+
+
+# Zusammenfassung 
+
+- 	Das vorliegende Skript ermöglicht einen strukturierten Einstieg in die Analyse von Krankenversicherungsprämien und zeigt, wie mit einfachen Mitteln schrittweise von der deskriptiven Betrachtung zu geeigneten Regressions- und GLM Modellen übergegangen werden kann. Es lässt sich ohne Weiteres auf eigene Versichertendaten anpassen.
+- Die ausgewählten linearen Modelle ermöglichen es, zentrale Einflussgrößen auf das Prämienniveau zu quantifizieren. Im Vergleich der Modelle zeigt sich, dass durch Gamma GLMs die heterogene Varianzstruktur besser abgebildet werden kann. 
+- Gleichzeitig werden Grenzen deutlich, vor allem durch eingeschränkte Datenqualität:
+    - Wenn –-- wie im vorliegenden Fall --- wichtige Strukturinformationen (z.B. konkrete Produktlinien, Höhe und Anlass von Risikozuschlägen, genaue Leistungsumfänge) im Datensatz gar nicht oder nur in grober Auflösung enthalten sind, können die Modelle nur einen Teil der beobachteten Variation erklären.
+    - Ausreißer (wie hier in der Prämienverteilung) verzerren / erschweren die Analysen. Sie sollten in der Datenaufbereitung erkannt und die Gründe identifiziert werden. Ggfs. ist der Datenbestand entsprechend zu bereinigen. 
+
+
+# Datenbasis 
+
+Quelle: „A dataset for health insurance analysis: Integrating individual and area-based contextual variables“ by Josep Lledó, Priscila Espinosa & Virgilio Pérez, Scientific Data Vol. 13 (2026).
+
+Der zusammen mit dem oben genannten Artikel veröffentlichte Datensatz ist ein anonymisierter Vertragsbestand eines spanischen Krankenversicherers, der verschiedene Produktlinien (Standard, Premium, International, Dental) sowie Informationen zu Alter, Geschlecht, Vertriebsweg, Vertragsart und Vertragsdauer (inkl. Neugeschäft- und Stornoangaben) enthält. Der Bestand umfasst rund 225.000 Sätze von über 70.000 versicherten Personen aus den Jahren 2017--2019. Er wurde angereichert um geografische und sozioökonomische Informationen aus öffentlich zugänglichen Daten des spanischen nationalen Statistikinstituts und anderer Quellen, die in der vorliegenden Analyse jedoch nicht einbezogen wurden. 
+
+# Datenaufbereitung
+
+Die Rohdaten liegen als Excel-Datei im Unterordner data vor. Nach dem Einlesen in R werden sie in ein data.table-Objekt konvertiert. Einige Variablen, die den Marktanteil des Versicherungsunternehmen beschreiben (z.B. n_insured_pc, n_insured_mun, n_insured_prov, IICIMUN, IICIPROV), werden gelöscht, da sie für die Analyse der Prämienstruktur nicht relevant sind. Die bereinigte Tabelle wird anschließend im Ordner data_cache abgelegt, um bei wiederholtem Aufruf das erneute langsame Einlesen der Excel-Datei zu vermeiden.
+
+
+
+```{r setup, include=FALSE}
+
+# Liste der benötigten Pakete
+packages <- c(
+  "readxl",
+  "DT",
+  "data.table",
+  "ggplot2",
+  "splines",
+  "knitr"
+)
+
+# ggf. fehlende Pakete installieren
+to_install <- packages[!(packages %in% installed.packages()[, "Package"])]
+if (length(to_install) > 0) {
+  install.packages(to_install, dependencies = TRUE)
+}
+
+  
+# library(readxl) nur qualifizierter Funktionsaufruf 
+# library(DT) nur qualifizierter Funktionsaufruf 
+library(data.table)
+library(ggplot2)
+library(splines)
+
+knitr::opts_chunk$set(echo = TRUE)
+
+if (!dir.exists("data_cache")) dir.create("data_cache")
+```
+
+
+```{r}
+if (!file.exists("data_cache/dt.RData")){
+  dt <- readxl::read_xlsx("data/Dataset of health insurance portfolio.xlsx")
+  dt <- data.table(dt)
+  
+  # keine Variabeln, die Marktanteil beschreiben
+  dt[, n_insured_pc := NULL]
+  dt[, n_insured_mun := NULL]
+  dt[, n_insured_prov := NULL]
+  dt[, IICIMUN := NULL]
+  dt[, IICIPROV := NULL]
+  save(dt, file = "data_cache/dt.RData", compress = TRUE)
+} else {
+  load("data_cache/dt.RData")
+}
+```
+
+
+
+# Erste deskriptive Analyse
+
+## Beobachtungszeitraum
+
+Zunächst wird die Verteilung über die Kalenderjahre (period) betrachtet. Die ausgewerteten Jahre liegen vor der COVID‑19‑Pandemie und sind in etwa gleich stark besetzt. Damit sind pandemiebedingte Verzerrungen der Gesundheitskosten und Prämien nicht zu erwarten, was die Vergleichbarkeit der Vertragsjahrgänge erleichtert. 
+
+
+```{r}
+dt[, list(Anzahl = .N), by = list(period)]
+```
+
+
+## Produktarten
+
+
+Das Portfolio umfasst vier generische Produktkategorien:
+
+- **S – Standard**: klassischer, kostengünstiger Krankenversicherungsschutz, 
+- **P – Premium**: erweiterter oder höherwertiger Krankenversicherungsschutz, 
+- **I – International**: Auslands- bzw. Reiseversicherungen, 
+- **D – Dental**: Zahnzusatz- oder Zahntarife. 
+
+
+Über eine einfache Häufigkeitsauswertung der Variable type_product wird deutlich, wie stark die einzelnen Produktarten im Bestand vertreten sind. Diese Segmentierung ist für die weitere Analyse zentral, da sich die Prämienstrukturen und die zugrunde liegenden Risiken deutlich unterscheiden.
+
+
+```{r}
+dt[, list(Anzahl = .N), by = list(type_product)]
+```
+
+
+## Erstattung / Ärztenetzwerk
+
+Die Variable reimbursement (= Erstattung) beschreibt, ob der Tarif auf Erstattung der Kosten oder auf die Nutzung eines vom Versicherer ausgewählten Netzwerkes von Leistungserbringern ausgelegt ist. Für die meisten Produktarten folgt die Art der Erstattung direkt aus type_product. Eine Ausnahme bildet der Produkttyp International (I), bei dem sowohl Erstattung als auch Netzwerkmodelle vorkommen.
+
+Bei  Reisetarifen könnte das damit zusammenhängen, dass es sich einerseits um Spanier handelt, die sich im Ausland versichern wollten, und andererseits um Ausländer, die sich in Spanien versichern wollen.
+
+```{r}
+dt[, list(Anzahl = .N), by = list(type_product, reimbursement)][order(type_product, reimbursement)]
+```
+
+
+
+##  Gruppenversicherung
+
+Die Variable type_policy unterscheidet zwischen Einzel- und Gruppenverträgen (I bzw. C). Ein Vergleich nach Produktart zeigt:
+
+- Gruppenverträge sind insgesamt deutlich in der Minderheit, 
+- mit einer auffälligen Ausnahme beim Standardprodukt S, wo Gruppenversicherungen einen erheblichen Teil des Bestands ausmachen.
+
+
+```{r}
+dt[, list(Anzahl = .N), by = list(type_product, type_policy)][order(type_product, type_policy)]
+```
+
+Für S steht mit type_policy_dg noch eine verfeinerte Unterteilung der Gruppengeschäfte zur Verfügung. Diese feinere Typisierung hat spürbare Auswirkungen auf die Prämienhöhe und wird später in der Modellierung separat berücksichtigt.
+
+
+```{r}
+dt[, list(Anzahl = .N), by = list(type_product, type_policy_dg)][order(type_product, type_policy_dg)]
+```
+
+## Geschlechterverteilung
+
+Die Verteilung von Männern und Frauen ist über das Portfolio insgesamt relativ ausgeglichen. Auf aggregierter Ebene sind keine extremen Schieflagen erkennbar.
+
+```{r}
+dt[, list(Anzahl = .N), by = list(type_product, gender)][order(type_product, gender)]
+```
+
+
+
+## Vertriebskanal
+
+Der Vertrieb erfolgt über drei Kanäle:
+
+- **A – Agency**: Ausschließlichkeits- oder Agenturvertrieb, 
+- **D – Direct business**:  Direktvertrieb (Online bzw. via Telefon), 
+- **I – Insurance Intermediary**: Makler, Mehrfachagenten.
+
+Die Häufigkeitsanalyse zeigt die Bedeutung der jeweiligen Kanäle. Auffällig ist, dass das Standardprodukt (S) ausschließlich über den Agenturvertrieb (A) verkauft wird. Dies deutet auf eine klare Vertriebsstrategie und eine Segmentierung der Vertriebswege nach Produktlinien hin.
+
+
+```{r}
+dt[, list(Anzahl = .N), by = list(distribution_channel)][order(distribution_channel)]
+```
+
+```{r}
+dt[, list(Anzahl = .N), by = list(type_product, distribution_channel)][order(type_product, distribution_channel)]
+```
+
+
+## Altersverteilung
+
+Die Altersverteilung der Versicherten wird als Histogramm dargestellt, getrennt nach Produktart. Kinder sind auffällig häufig im Premiumtarif (P) versichert. Dies könnte eine Folge davon sein, dass in Spanien häufig Krankenversicherungen in Form einer Familienversicherung angeboten werden.
+
+
+```{r}
+ggplot(dt, aes(age, col = type_product)) +
+  geom_histogram(binwidth = 5)
+```
+
+
+
+
+# Analyse der Prämienverteilung
+
+Im nächsten Schritt wird die Verteilung der Jahresprämien (premium) untersucht.
+
+
+
+## Gesamtbild und Ausreißer
+
+Die Prämienverteilung nach Produktart ist wie folgt:
+
+
+
+```{r}
+ggplot(dt, aes(premium, col = type_product)) +
+  geom_histogram(binwidth = 10)
+```
+
+Es gibt einige sehr hohe Prämienwerte, insbesondere in den Produktarten S und P.
+Durch tabellarische Betrachtung der höchsten Prämien lässt sich bestätigen, dass diese Extremwerte vor allem bei älteren Versicherten auftreten, vermutlich aufgrund von Risikozuschlägen.
+
+
+
+```{r}
+DT::datatable(dt[premium > 8000][order(-premium)])
+```
+
+
+Um die „typische“ Prämienstruktur sichtbar zu machen, werden die Diagramme auf einen Maximalwert von 2.500 begrenzt. Dann:
+
+- sticht das Dentalprodukt (D) durch auffallend niedrige Prämien hervor, 
+- unterscheiden sich die Verteilungen der übrigen Produkte deutlich, wobei S und P in ähnlichen Prämienbereichen liegen, International (I) aber eine besondere, deutlich multimodale Struktur zeigt.
+
+```{r}
+ggplot(dt, aes(premium, col = type_product)) +
+  geom_histogram(binwidth = 10, na.rm = TRUE) +
+  xlim(c(NA, 2500))
+```
+
+
+```{r}
+ggplot(dt, aes(premium, col = type_product)) +
+  geom_density(linewidth = 1.5, na.rm = TRUE) +
+  xlim(c(NA, 2500))
+```
+
+Das Produkt D wird von den folgenden Grafiken ausgeschlossen, um die Verteilung der Restlichen sehen zu können.
+
+```{r}
+ggplot(dt[type_product != "D"], aes(premium, col = type_product)) +
+  geom_density(linewidth = 1.5, na.rm = TRUE) +
+  xlim(c(NA, 2500))
+```
+
+## Einfluss von Erstattungsart und Vertriebskanal
+
+Die multimodale Verteilung der Prämien in den Nicht-Dentalprodukten wirft die Frage auf, ob sie durch die Erstattungsart (reimbursement) erklärbar ist. Dichteplots nach reimbursement legen nahe, dass insbesondere bei International unterschiedliche Produktlinien existieren.
+
+
+```{r}
+ggplot(dt[type_product != "D"], aes(premium, col = type_product, linetype = reimbursement)) +
+  geom_density(linewidth = 1.5, na.rm = TRUE) +
+  xlim(c(NA, 2500))
+```
+
+Weiterhin wird die Prämienverteilung nach Vertriebskanal analysiert. Dabei zeigt sich:
+
+- Die Prämienstrukturen unterscheiden sich deutlich zwischen den Kanälen.
+- Insbesondere im Direktgeschäft (D) scheinen kaum Risikozuschläge vorzukommen, was zu einem homogeneren und tendenziell niedrigeren Prämienniveau führt.
+
+
+
+```{r}
+ggplot(dt[type_product != "D"], aes(premium, col = type_product, linetype = distribution_channel)) +
+  geom_density(linewidth = 1.5, na.rm = TRUE) +
+  xlim(c(NA, 2500))
+```
+
+Zusätzlich werden die Prämien nach Policy-Typ (type_policy) betrachtet, um Unterschiede zwischen Einzel- und Gruppenverträgen sichtbar zu machen.
+
+```{r}
+ggplot(dt[type_product != "D"], aes(premium, col = type_product, linetype = type_policy)) +
+  geom_density(linewidth = 1.5, na.rm = TRUE) +
+  xlim(c(NA, 2500))
+```
+
+
+# Detailanalysen nach Produktart
+
+## Internationale Produkte (I)
+
+Die Prämien von internationalen Tarifen weisen eine deutliche Segmentierung auf. Es lassen sich visuell etwa drei Gruppen erkennen:
+
+- Zwei Produktlinien von günstigen Tarifen mit Erstattung:  Vermutlich handelt es sich hier um klassische Reisekrankenversicherungen für kurze Auslandsaufenthalte. Die Preisdifferenz beruht vermutlich darauf, dass es in Spanien üblich ist für gefährliche Sportarten, wie zum Beispiel Wintersport, einen Risikozuschlag zu erheben.
+
+- Mittleres und hohes Prämiensegment mit Behandlung im Ärztenetzwerk: Hier sind klare diskrete Sprünge bei bestimmten Altersgrenzen zu beobachten. Dies könnte auf Tarife für längerfristige Aufenthalte (z.B. Expatriates, Ausländer in Spanien) hindeuten.
+
+```{r}
+ggplot(dt[type_product == "I"], aes(age, premium, col = reimbursement)) +
+  geom_point(na.rm = TRUE, alpha = 0.25) +
+  ylim(c(NA, 2500))
+```
+
+Tatsächlich gibt es in der vermuteten Kurzreiseversicherung eine dritte  Produktlinie in Form einer Gruppenversicherung.
+
+```{r}
+ggplot(dt[type_product == "I"], aes(age, premium, col = type_policy)) +
+  geom_point(na.rm = TRUE, alpha = 0.25) +
+  ylim(c(NA, 2500))
+```
+
+Der Vertriebskanal erklärt die günstigste Variante nur teilweise; offenbar sind mehrere Tarife über verschiedene Kanäle erhältlich.
+
+```{r}
+ggplot(dt[type_product == "I"], aes(age, premium, col = distribution_channel)) +
+  geom_point(na.rm = TRUE, alpha = 0.25) +
+  ylim(c(NA, 2500))
+```
+
+
+Die Geschlechterverteilung hat, zumindest visuell, keinen dominanten Einfluss auf das Prämienniveau.
+
+```{r}
+ggplot(dt[type_product == "I"], aes(age, premium, col = gender)) +
+  geom_point(na.rm = TRUE, alpha = 0.25) +
+  ylim(c(NA, 2500))
+```
+
+
+
+## Dentalprodukte (D)
+
+Bei den Dentalprodukten liegen die Prämien auf einem insgesamt niedrigen Niveau, zeigen aber eine ausgeprägt multimodale Verteilung.
+
+```{r}
+ggplot(dt[type_product == "D"], aes(premium)) +
+  geom_density(linewidth = 1.5, na.rm = TRUE) 
+```
+
+Die Prämie scheint altersunabhängig zu sein: Scatterplots von Prämie gegen Alter sind flach. Dies legt nahe, dass mehrere Produktlinien existieren (z.B. unterschiedliche Erstattungsquoten oder Leistungsumfänge), die im Datensatz nicht explizit gekennzeichnet sind.
+
+```{r}
+ggplot(dt[type_product == "D"], aes(age, premium)) +
+  geom_point(na.rm = TRUE, alpha = 0.25) 
+```
+
+Gruppenversicherungen konzentrieren sich in bestimmten Alters- und Prämienbereichen, was auf zielgruppenspezifische Kollektivverträge hinweist.
+
+```{r}
+ggplot(dt[type_product == "D"], aes(age, premium, col = type_policy)) +
+  geom_point(na.rm = TRUE, alpha = 0.25) 
+```
+
+Der Vertriebskanal beeinflusst den Absatz der verschiedenen Dentalprodukte deutlich; unterschiedliche Kanäle scheinen unterschiedliche Produktvarianten zu bevorzugen. 
+
+
+```{r}
+ggplot(dt[type_product == "D"], aes(age, premium, col = distribution_channel)) +
+  geom_point(na.rm = TRUE, alpha = 0.25)
+```
+
+Auf den ersten Blick zeigt sich keine starke geschlechtsspezifische Differenzierung.
+
+```{r}
+ggplot(dt[type_product == "D"], aes(age, premium, col = gender)) +
+  geom_point(na.rm = TRUE, alpha = 0.25)
+```
+
+
+
+## Standardprodukte (S)
+
+Auch die Standardprodukte haben eine deutlich multimodale Verteilung der Prämien.
+
+
+```{r}
+ggplot(dt[type_product == "S" & premium <= 2500], aes(premium)) +
+  geom_density(linewidth = 1.5, na.rm = TRUE) 
+```
+
+
+Für die Standardprodukte zeigt sich eine klar erkennbare Altersabhängigkeit der Prämien:
+
+- Scatterplots von Prämie gegen Alter weisen auf ein steigendes Prämienprofil mit zunehmendem Alter hin,
+- zudem sind mindestens zwei Produktlinien erkennbar, da sich die Punktewolken in verschiedene Bänder aufspalten.
+
+Auffällig sind einige sehr hohe Prämienwerte, die sich plausibel als Risikozuschläge interpretieren lassen.
+
+
+
+```{r}
+ggplot(dt[type_product == "S"], aes(age, premium)) +
+  geom_point(na.rm = TRUE, alpha = 0.01) +
+  ylim(c(NA, 4000))
+```
+
+
+Gruppenversicherungen spielen bei S eine große Rolle:
+
+- Das Gruppengeschäft streut weniger, die Prämien sind homogener und weisen tendenziell weniger extreme Ausreißer auf.
+- In der feineren Unterteilung type_policy_dg (Self‑Employed, Individual, Collective 1–4) zeigt sich, dass die verschiedenen Kollektivarten mit unterschiedlichen Prämienniveaus einhergehen.
+
+```{r}
+ggplot(dt[type_product == "S"], aes(age, premium, col = type_policy)) +
+  geom_point(na.rm = TRUE, alpha = 0.05) +
+  ylim(c(NA, 4000))
+```
+
+
+```{r}
+ggplot(dt[type_product == "S"], aes(age, premium, col = type_policy_dg)) +
+  geom_point(na.rm = TRUE, alpha = 0.05) +
+  ylim(c(NA, 4000))
+```
+
+Die Analyse nach Vertriebskanal bestätigt einen engen Zusammenhang zwischen Gruppenverträgen und bestimmten Kanälen, insbesondere dem Agenturvertrieb. Eine tabellarische Kreuztabelle zeigt diesen Zusammenhang explizit. 
+
+```{r}
+ggplot(dt[type_product == "S"], aes(age, premium, col = distribution_channel)) +
+  geom_point(na.rm = TRUE, alpha = 0.05) +
+  ylim(c(NA, 4000))
+```
+
+```{r}
+dcast(dt[type_product == "S", list(Anzahl = .N), by = list(type_policy, distribution_channel)],
+      type_policy ~ distribution_channel, value.var = "Anzahl")
+```
+
+Eine starke geschlechtsspezifische Prämienstruktur ist nicht ersichtlich.
+
+```{r}
+ggplot(dt[type_product == "S"], aes(age, premium, col = gender)) +
+  geom_point(na.rm = TRUE, alpha = 0.05) +
+  ylim(c(NA, 4000))
+```
+
+
+
+## Premiumprodukte (P)
+
+Die Premiumprodukte haben im Wesentlichen eine unimodale Verteilung der Prämien.
+
+```{r}
+ggplot(dt[type_product == "P" & premium <= 2500], aes(premium)) +
+  geom_density(linewidth = 1.5, na.rm = TRUE) 
+```
+
+Die Premiumprodukte zeigen ebenfalls eine deutliche Altersabhängigkeit.
+
+- Das Prämienprofil steigt mit dem Alter, zudem sind Risikozuschläge erkennbar.
+
+- Im Gegensatz zu S wirkt die Prämienverteilung in Abhängigkeit vom Alter eher unimodal, was für ein einheitlicheres Tarifgefüge spricht.
+
+
+```{r}
+ggplot(dt[type_product == "P"], aes(age, premium)) +
+  geom_point(na.rm = TRUE, alpha = 0.01) +
+  ylim(c(NA, 4000))
+```
+
+Beim Vergleich von Einzel- und Kollektivverträgen:
+
+- Kollektivverträge sind im Mittel günstiger und weisen geringere Streuung auf, 
+- einzelne hohe Prämien weisen aber auch hier auf Risikozuschläge hin.
+
+```{r}
+ggplot(dt[type_product == "P"], aes(age, premium, col = type_policy)) +
+  geom_point(na.rm = TRUE, alpha = 0.05) +
+  ylim(c(NA, 4000))
+```
+
+
+Die Betrachtung nach Vertriebskanal legt einen Zusammenhang mit dem Gruppenversicherungskennzeichen nahe, der durch eine Kreuztabelle von type_policy und distribution_channel bestätigt wird. 
+
+```{r}
+ggplot(dt[type_product == "P"], aes(age, premium, col = distribution_channel)) +
+  geom_point(na.rm = TRUE, alpha = 0.05) +
+  ylim(c(NA, 4000))
+```
+
+```{r}
+dcast(dt[type_product == "P", list(Anzahl = .N), by = list(type_policy, distribution_channel)],
+      type_policy ~ distribution_channel, value.var = "Anzahl")
+```
+
+Eine deutliche Geschlechtsabhängigkeit ist nicht erkennbar.
+
+```{r}
+ggplot(dt[type_product == "P"], aes(age, premium, col = gender)) +
+  geom_point(na.rm = TRUE, alpha = 0.05) +
+  ylim(c(NA, 4000))
+```
+
+# Modellierung der Prämien
+
+## Modellierung für Dentalprodukte (D)
+
+Da bei D visuell keine ausgeprägte Abhängigkeit der Prämie vom Alter erkennbar ist, werden als Einflussfaktoren nur berücksichtigt:
+
+- type_policy (Einzel vs. Gruppenvertrag), 
+- distribution_channel (I, A, D), 
+- gender (F, M).
+
+Problematisch ist, dass die verschiedenen Dentalproduktlinien (z.B. unterschiedliche Leistungspakete) im Datensatz nicht explizit kodiert sind. Diese unbeobachtete Heterogenität dürfte einen Großteil der Prämienunterschiede erklären, muss  aber im Modell unberücksichtigt bleiben.
+
+Die kategorialen Variablen werden so kodiert, dass die jeweils größte Gruppe als Referenzkategorie dient.
+
+
+```{r}
+dt_D <- dt[type_product == "D", list(
+  type_policy = factor(type_policy, c("I", "C"), c("I", "C")),
+  distribution_channel = factor(distribution_channel, c("I", "A", "D")),
+  gender = factor(gender, c("F", "M"), c("F", "M")),
+  premium
+)]
+```
+
+Es wird ein einfaches lineares Regressionsmodell basierend auf den oben erwähnten Einflussfaktoren geschätzt:
+
+
+```{r}
+lin_modell_D <- lm(premium ~ type_policy + distribution_channel + gender, dt_D )
+```
+
+
+Die Modellzusammenfassung zeigt:
+
+- Gruppenversicherungen (type_policy = C) und bestimmte Vertriebskanäle (z.B. A) sind mit signifikant niedrigeren Prämien verbunden. 
+- Diese Effekte spiegeln allerdings nicht zwingend echte Preisnachlässe wider, sondern können auch auf unterschiedliche verkaufte Produktmischungen zurückgehen. 
+- Das Bestimmtheitsmaß (R^2) ist relativ gering, d.h. nur ein kleiner Teil der Varianz wird durch die im Modell enthaltenen Variablen erklärt. 
+
+
+```{r}
+summary(lin_modell_D)
+```
+
+
+Die Diagnoseplots des linearen Modells zeigen zudem, dass einzelne sehr niedrige oder „Zwischenprämien“ die Modellanpassung stören. Diese könnten auf Sondertarife, Rabatte oder spezifische Produktkombinationen hinweisen, die im Datensatz nicht als eigene Variable erfasst sind.
+
+```{r}
+plot(lin_modell_D)
+```
+
+
+
+
+## Modellierung für Internationale Produkte (I)
+
+Bei I gibt es ein deutlich stufiges Altersprofil und eine sehr starke Differenzierung nach reimbursement. Neben dem Alter werden die folgenden Faktoren berücksichtigt:
+
+
+Wie die Analysen gezeigt haben, gibt es bei der Produktklasse I ein deutlich stufiges Altersprofil und eine sehr starke Differenzierung nach der Art der Leistungserbringung (reimbursement yes/no). Neben dem Alter werden die folgenden Faktoren berücksichtigt:
+
+- type_policy (I / C),
+- distribution_channel (I, A, D),
+- gender (F, M),
+- reimbursement (Yes / No).
+
+Ein naheliegender erster Ansatz ist ein lineares Modell mit einem Polynom in age und Interaktion mit reimbursement, so dass es für jede Art der Erstattung eine eigene Altersverteilung gibt. Testen mit steigenden Polynomgrad zeigt, dass auch der siebte Grad noch signifikanten Einfluss hat. Auch der Einfluss der restlichen diskreten Faktoren könnten abhängig von der Erstattungsart sein, wir nehmen jedoch zunächst an, dass dies nicht so ist.
+
+```{r}
+dt_I <- dt[type_product == "I", list(
+  type_policy = factor(type_policy, c("I", "C"), c("I", "C")),
+  distribution_channel = factor(distribution_channel, c("I", "A", "D")),
+  gender = factor(gender, c("F", "M"), c("F", "M")),
+  age,
+  reimbursement,
+  premium
+)]
+```
+
+```{r}
+lin_modell_I <- lm(premium ~ reimbursement * poly(age, 7) +  type_policy +   distribution_channel +  gender, dt_I)
+
+summary(lin_modell_I)
+```
+
+Das Modell sieht die Erstattungart nicht als signifikantes Merkmal an! Genauer sind die Preise der Erstattungstarife für Jüngere bei diesem Modell deutlich kleiner als die Residualstreuung. Daher ist es nötig, dass die Erstattungstarife seperat modelliert werden. Reimbursement also als Trennkriterium verwendet wird und zwei separate Modelle geschätzt werden.
+
+
+### reimbursement = Yes
+
+Für die Erstattungstarife (vermutlich Kurzreiseprodukte) zeigt sich, dass ein Polynom vierten Grades in age ausreichend ist:
+
+```{r}
+lin_modell_I_Yes <- lm(premium ~ poly(age, 4) + type_policy + distribution_channel + gender, dt_I[reimbursement == "Yes"])
+
+summary(lin_modell_I_Yes)
+```
+
+Das Modell erklärt einen relevanten Teil der Variation, aber einzelne sehr hohe Prämien (vermutlich Risikozuschläge) führen zu deutlichen Residuen.
+
+Man erkennt auch, dass die hohen Residuen nicht mehr einer Normalverteilung folgen. Auch steigt die Varianz der Residuen mit den Prämien --- wie zu erwarten war, aber im Gegensatz zu den An-nahmen einer einfachen linearen Regression. 
+
+Kein Datenpunkten hat einen extremen Einfluss auf das angepasste Modell.
+
+
+```{r}
+plot(lin_modell_I_Yes)
+```
+
+
+#### als GLM mit Gamma Verteilung
+
+Um der Tatsache Rechnung zu tragen, dass Prämien immer positiv sind, die Varianz der Residuen mit der Prämie steigt und hohe Werte häufiger als unter einer Normalverteilung angenommen auftreten, wird ein verallgemeinertes lineares Modell (GLM) mit Gamma‑Verteilung und Identitätslink geschätzt:
+
+```{r}
+glin_modell_I_Yes <- glm(
+  premium ~  poly(age, 4) + type_policy + distribution_channel + gender, 
+  family = Gamma(link = "identity"), 
+  dt_I[reimbursement == "Yes"])
+
+summary(glin_modell_I_Yes)
+```
+
+Dieses Modell bildet die Varianzstruktur deutlich besser ab und reduziert den Einfluss der extrem hohen Prämienwerte auf die Schätzung des Erwartungswertes.
+
+```{r}
+plot(glin_modell_I_Yes)
+```
+
+
+### reimbursement = No
+
+Für Tarife ohne Erstattung zeigen die Daten diskrete Alterssprünge für die Prämien. 
+Das lässt sich mit zwei Indikatorvariablen im Modell abbilden:
+
+- age60 = 1, falls Alter ≥ 60,
+- age65 = 1, falls Alter ≥ 65.
+
+
+<!-- ```{r} -->
+<!-- dt_I[reimbursement == "No" & premium < 1000 & age >= 55, list(Anzahl = .N), by = list(age)][order(-age)] -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- dt_I[reimbursement == "No" & premium < 1500 & age >= 60, list(Anzahl = .N), by = list(age)][order(-age)] -->
+<!-- ``` -->
+
+
+```{r}
+dt_I[, age60 := age >= 60]
+dt_I[, age65 := age >= 65]
+```
+
+Da in diesem Segment keine Gruppenversicherungen mehr vorkommen, entfällt type_policy als Einflussfaktor. Es verbleiben:
+
+- Altersindikatoren (age60, age65),
+- distribution_channel,
+- gender.
+
+```{r}
+dt_I[reimbursement == "No", list(Anzahl = .N), by = list(type_policy)]
+```
+
+Das lineare Modell lautet dann:
+
+```{r}
+lin_modell_I_No <- lm(premium ~  age60 +  age65 + distribution_channel + gender, 
+                      dt_I[reimbursement == "No"])
+
+summary(lin_modell_I_No)
+```
+
+Die Diagnoseplots zeigen erneut, dass einzelne hohe Prämien (Risikozuschläge) die Varianz der Residuen stark erhöhen und es dort auch zur Verletzung der Normalverteilungsannahme führen.
+
+```{r}
+plot(lin_modell_I_No)
+```
+
+
+
+### als GLM mit Gamma Verteilung
+
+Aus Gründen der besseren Varianzmodellierung wird erneut ein GLM mit Gamma--Verteilung und Identitätslink geschätzt. 
+
+```{r}
+glin_modell_I_No <- glm(
+  premium ~  age60 +  age65 +  distribution_channel + gender,
+  family = Gamma(link = "identity"), 
+  dt_I[reimbursement == "No"])
+
+summary(glin_modell_I_No)
+```
+
+Ein GLM mit Gamma‑Verteilung und Identitätslink führt entsprechend zu einer besseren Modellierung der Varianzstruktur. Trotzdem bleiben extreme Werte problematisch. Leider kann bei einem verallgemeinerten linearen Modell keine Verteilung mit stark ausgeprägten Randbereichen, wie bei einer Pareto‑Verteilung, verwendet werden.
+
+
+```{r}
+plot(glin_modell_I_No)
+```
+
+
+## Gemeinsame Modellierung für S und P
+
+Da S (Standard) und P (Premium) im Wesentlichen die gleichen medizinischen Leistungen abdecken, erscheint eine gemeinsame Modellierung dieser beiden Produktlinien sinnvoll. type_product bleibt dabei als erklärende Variable im Modell enthalten, um unterschiedliche Prämienniveaus abzubilden.
+
+Die Erstattungsart folgt bei diesen Produkten aus type_product und muss daher nicht separat modelliert werden. Als Einflussfaktoren werden berücksichtigt:
+
+- type_product (S vs. P),
+- type_policy_dg (feine Aufteilung der Vertragstypen: Individual, Self-Employed, Collective 1–4),
+- distribution_channel (I, A, D),
+- gender (F, M),
+- age (als kontinuierliche Variable).
+
+
+Referenz für die kategoriellen Variablen sollte die größte Gruppe sein.
+
+```{r}
+dt_SP <- dt[type_product %in% c("S", "P"), list(
+  type_product,
+  type_policy_dg = factor(type_policy_dg, c("I", "SE", "C1", "C2", "C3", "C4"), c("I", "SE", "C1", "C2", "C3", "C4")),
+  distribution_channel = factor(distribution_channel, c("I", "A", "D")),
+  gender = factor(gender, c("F", "M"), c("F", "M")),
+  age,
+  premium
+)]
+```
+
+
+Aufgrund der komplexen Altersstruktur und der Interaktion mit den kategorialen Variablen wird anstelle hoher Polynome ein Splines-Ansatz gewählt. Mit B‑Splines (bs(age, df = 10)) wird das Altersprofil flexibel und insbesondere lokal kontrolliert modelliert.
+
+```{r}
+spl <- data.table(age = dt_SP$age, bs(dt_SP$age, df = 10)) 
+spl <- unique(spl)[order(age)]
+
+spl <- melt(spl,id.vars = "age",  variable.name = "spline")
+ 
+ggplot(spl, aes(x = age, y = value, col = spline)) +
+  geom_line()
+```
+
+Die verwendete Modellform ist ein lineares Modell mit Interaktion aller kategorialen Faktoren mit den Alters‑Splines. 
+
+Die Modellzusammenfassung zeigt:
+
+- Signifikante Effekte der Produktart und des Produkttyps, insbesondere in höheren Alterssegmenten,
+- signifikante Unterschiede zwischen den Vertriebskanälen,
+- Geschlechtereffekte sind vorhanden, aber im Vergleich zu anderen Faktoren weniger dominant.
+
+
+Die Varianz der Fehler ist hoch relativ im Vergleich zum Prämienniveau der jüngeren Versicherten, was angesichts der teilweise sehr hohen Prämien im hohen Alter nicht überrascht. Auch R^2 ist nicht befriedigend, erklärt sich aber aus der unvollständig beobachteten Tarifstruktur (fehlende Produktlinienkennzeichnung, Risikozuschläge).
+
+
+
+```{r}
+lin_modell_SP <- lm(premium ~  type_product * bs(age, df = 10) + 
+                      type_policy_dg * bs(age, df = 10) + 
+                      distribution_channel * bs(age, df = 10) + 
+                      gender * bs(age, df = 10), 
+                    dt_SP)
+
+summary(lin_modell_SP)
+```
+
+```{r}
+AIC(lin_modell_SP)
+```
+
+```{r}
+plot(lin_modell_SP)
+```
+
+
+
+### als GLM mit Gamma Verteilung
+
+
+Aus Gründen der besseren Varianzmodellierung wird erneut ein GLM mit Gamma‑Verteilung und Identitätslink geschätzt. 
+
+```{r}
+glin_modell_SP <- glm(premium ~  type_product * bs(age, df = 10) + 
+                      type_policy_dg * bs(age, df = 10) + 
+                      distribution_channel * bs(age, df = 10) + 
+                      gender * bs(age, df = 10),
+                      family = Gamma(link = "identity"),
+                    dt_SP)
+
+summary(glin_modell_SP)
+```
+
+
+Hier zeigt sich:
+
+- Das Modell bildet die Varianzstruktur deutlich besser ab.
+- Der AIC ist im Vergleich zum Gauß-Modell deutlich geringer, was auf eine insgesamt bessere Modellgüte hindeutet.
+- Extreme, sehr hohe Prämienwerte treten immer noch häufiger auf als unter der Gammaannahme zu erwarten wäre. Da die Exponentialfamilien von Verteilungen definitionsgemäß keine stark ausgeprägten Randbereiche zulassen, bleiben diese Ausreißer eine Herausforderung.
+
+```{r}
+plot(glin_modell_SP)
+```
+
+
+# Fazit
+
+Die Analyse zeigt:
+
+- Eine starke Segmentierung des Portfolios nach Produktart, Erstattungsform, Vertriebsweg und Produkttyp,
+- ausgeprägte Altersabhängigkeiten insbesondere bei den Standard- und Premiumprodukten,
+- Diskretisierung im Altersprofil bei internationalen Tarifen ohne Erstattung,
+- punktuelle, teilweise sehr hohe Prämienwerte, die sich plausibel als Risikozuschläge interpretieren lassen.
+
+Die gewählten linearen Modelle ermöglichen es zentrale Einflussgrößen auf das Prämienniveau zu quantifizieren. Durch den Wechsel zu Gamma‑GLMs kann die heterogene Varianzstruktur besser abgebildet werden. Gleichzeitig werden Grenzen deutlich:
+
+- Wichtige Strukturinformationen (z.B. konkrete Produktlinien, Höhe und Anlass von Risikozuschlägen, genaue Leistungsumfänge) sind im Datensatz nicht enthalten.
+- Die Modelle können daher nur einen Teil der beobachteten Variation erklären und sollten eher als explorative Werkzeuge, denn als produktionsreife Tarifmodelle verstanden werden.
+
+Insgesamt liefert das Skript einen strukturierten Einstieg in die Analyse von Krankenversicherungsprämien und zeigt, wie mit einfachen Mitteln schrittweise von der deskriptiven Betrachtung zu geeigneten Regressions- und GLM‑Modellen übergegangen werden kann.
+
+
+Mögliche Erweiterungen wären:
+
+- Einbeziehung von der Schadendaten, um die Prämienstruktur mit der Leistungsseite zu verknüpfen, 
+- Untersuchung des Einflusses der Regiodaten auf Prämien und Leistung.
+- Analyse der Stornodaten unter Berücksichtigung von Prämien und Leistung.
+
+
+
