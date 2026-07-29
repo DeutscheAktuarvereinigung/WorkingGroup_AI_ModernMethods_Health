@@ -2,7 +2,7 @@
 
 Dieses Repository bündelt die frei verfügbaren Werkzeuge der Arbeitsgruppe
 **„Künstliche Intelligenz und moderne Methoden in der Krankenversicherung“**
-des Ausschusses Actuarial Data Science / AI (ADS/AI) der Deutschen
+des Ausschusses Krankenversicherung der Deutschen
 Aktuarvereinigung e. V. (DAV). Die Arbeitsgruppe untersucht, wie künstliche
 Intelligenz (KI), maschinelles Lernen und moderne Softwareentwicklung die
 aktuarielle Arbeit in der privaten Krankenversicherung (PKV) unterstützen
