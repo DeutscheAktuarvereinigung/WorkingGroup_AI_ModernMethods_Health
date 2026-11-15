@@ -1,0 +1,409 @@
+{
+ "dokument": "fehlerhaft",
+ "laufzeit_s": 59.55952835083008,
+ "ergebnisse": [
+  {
+   "id": "V-01",
+   "titel": "Kaputte Verweise („??“)",
+   "methode": "deterministisch",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "V-01",
+     "beschreibung": "Nicht aufgelöster Verweis: „..., ax+1/2 = 1 2 (︀ax+ ax+1 )︀, A111 := 0, a111 := 0, (32) verwendet (Anlage 5.2, Abschnitt ??); die Bilanzdeckungsrückstellung einer ...“",
+     "seite": 45,
+     "schwere": "FEHLER"
+    }
+   ],
+   "hinweis": "93 Seiten durchsucht.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-02",
+   "titel": "Existenz interner Verweise",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "252 Teil-Verweise und 35 Gleichungs-Verweise geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-03",
+   "titel": "Inhaltsverzeichnis (Titel und Seitenzahlen)",
+   "methode": "deterministisch",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "V-03",
+     "beschreibung": "Titel-Abweichung bei Anlage 3.1: IHV nennt „Grundwerte der Versicherungstechnik“, die Überschrift lautet aber „Versicherungstechnische Grundwerte“ (Seite 81).",
+     "seite": 3,
+     "schwere": "FEHLER"
+    }
+   ],
+   "hinweis": "65 IHV-Einträge gegen Überschriften geprüft (Seitenversatz +1).",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-04",
+   "titel": "Vollständigkeit des Symbolverzeichnisses",
+   "methode": "deterministisch",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "V-04",
+     "beschreibung": "Symbol „DQx“ (Stamm „DQ“) wird 19-mal verwendet (u. a. Seiten [7, 20, 34, 44]), ist im Symbolverzeichnis aber nicht erklärt.",
+     "seite": 7,
+     "schwere": "FEHLER"
+    }
+   ],
+   "hinweis": "141 verschiedene Symbole gegen 58 Glossar-Einträge geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-05",
+   "titel": "Tabellen-Identitäten und Rechnungszins",
+   "methode": "deterministisch",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "V-05",
+     "beschreibung": "Anlage 2.2 – Ausscheideordnung Männer: qx, wx, (q+ w)xund DQx…, Alter 50: (q+w)_x = 0,037271 stimmt nicht mit q_x + w_x = 0,036271 überein.",
+     "seite": 62,
+     "schwere": "FEHLER"
+    },
+    {
+     "check_id": "V-05",
+     "beschreibung": "Zins-Übersicht (Anlage 2.1, Seite 60) nennt für „F“ 2,2 %, die Tabelle Anlage 2.2 – Ausscheideordnung Frauen: qx, wx, (q+ w)xund DQx… ist aber erkennbar mit 2.0 % gerechnet (aus DQ_x = v·(1−(q+w)_x)).",
+     "seite": 60,
+     "schwere": "FEHLER"
+    }
+   ],
+   "hinweis": "180 Zeilen-Identitäten geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-06",
+   "titel": "Monotonie der Beitragstabellen",
+   "methode": "deterministisch",
+   "status": "WARNUNG",
+   "befunde": [
+    {
+     "check_id": "V-06",
+     "beschreibung": "Anhang 3, Spalte b_x (Spalte 3): Wert fällt von Alter 50 (653,33) auf Alter 51 (651,63). Kann systembedingt sein, sollte aber geprüft werden.",
+     "seite": 89,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "V-06",
+     "beschreibung": "Anhang 3, Spalte b_x (Spalte 5): Wert fällt von Alter 64 (814,70) auf Alter 65 (813,43). Kann systembedingt sein, sollte aber geprüft werden.",
+     "seite": 90,
+     "schwere": "WARNUNG"
+    }
+   ],
+   "hinweis": "356 Altersübergänge geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-07",
+   "titel": "Abgleich mit Referenzwerten (CSV)",
+   "methode": "deterministisch",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "V-07",
+     "beschreibung": "Anlage 2.2 – Ausscheideordnung Männer: qx, wx, (q+ w)xund DQx…, Alter 50, Spalte „qw“ (Nr. 4): PDF zeigt 0,037271, Referenz (rechnungsgrundlagen_M.csv) ergibt 0,036271.",
+     "seite": 62,
+     "schwere": "FEHLER"
+    },
+    {
+     "check_id": "V-07",
+     "beschreibung": "Anhang 3, Alter 50, Spalte „b“ (Nr. 3): PDF zeigt 653,33, Referenz (rechnungsgrundlagen_M.csv) ergibt 635,33.",
+     "seite": 89,
+     "schwere": "FEHLER"
+    }
+   ],
+   "hinweis": "24 Spalten den Referenz-CSVs zugeordnet, 2160 Zellen verglichen.",
+   "dauer_s": 0.03,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-08",
+   "titel": "Konsistenz benannter Parameter",
+   "methode": "deterministisch",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "V-08",
+     "beschreibung": "Widersprüchliche Werte für „GM“: 1910,0070 EUR (Seite 73); 1901,0070 EUR (Seite 73).",
+     "seite": 73,
+     "schwere": "FEHLER"
+    }
+   ],
+   "hinweis": "14 Parameter-Zuweisungen zu 12 Symbolen geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-09",
+   "titel": "Gesetzes- und Paragrafen-Prüfung",
+   "methode": "deterministisch",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "V-09",
+     "beschreibung": "„Höchstrechnungszins“ wird mit „§ 4 VAG“ belegt – einschlägig ist jedoch § 4 KVAV. (Der Rechnungszins in der PKV ist in § 4 KVAV geregelt.)",
+     "seite": 16,
+     "schwere": "FEHLER"
+    },
+    {
+     "check_id": "V-09",
+     "beschreibung": "Sicherheitszuschlag von 4,5 % (Seiten [79]) unterschreitet den gesetzlichen Mindestsatz von 5 % der Bruttoprämie (§ 7 KVAV).",
+     "seite": 79,
+     "schwere": "FEHLER"
+    },
+    {
+     "check_id": "V-09",
+     "beschreibung": "Der Sicherheitszuschlag wird uneinheitlich angegeben: 4,5 % (Seiten [79]); 5 % (Seiten [79]).",
+     "seite": 79,
+     "schwere": "FEHLER"
+    }
+   ],
+   "hinweis": "6 Normbezüge bzw. Zuschlagsangaben geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-10",
+   "titel": "Referenzen auf Rahmen-Berechnungsgrundlagen",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "8 Referenzen gegen ein Register mit 3 Einträgen geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-11",
+   "titel": "Versions- und Stichtagskonsistenz",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "99 Nummern- und 92 Datumsangaben geprüft (Dokumentstand: Nr. 17); Historie bis Nr. 17.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-12",
+   "titel": "Vollständigkeit und Wertebereiche der Alterstabellen",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "9 Alterstabellen mit 3473 Werten auf Lücken, Endalter und Wertebereiche geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-13",
+   "titel": "Abgleich mit der Referenzdatenbank (SQLite)",
+   "methode": "deterministisch",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "V-13",
+     "beschreibung": "Anlage 2.2 – Ausscheideordnung Männer: qx, wx, (q+ w)xund DQx…, Alter 50, Spalte „qw“ (Nr. 4): PDF zeigt 0,037271, die Referenzdatenbank (M) ergibt 0,036271 (Datenbank: q_x + w_x).",
+     "seite": 62,
+     "schwere": "FEHLER"
+    }
+   ],
+   "hinweis": "8 Spalten der Datenbank zugeordnet, 720 Zellen verglichen (rechnungsgrundlagen.db).",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "L-01",
+   "titel": "Rechtschreibprüfung",
+   "methode": "LLM",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "L-01",
+     "beschreibung": "Rechtschreibfehler „Krankheitskostenvollversichrung“ (richtig: „Krankheitskostenvollversicherung“) im Kontext: „...Versicherungsform: Krankheitskostenvollversichrung für die Leistungsbereiche ambulante Hei...“",
+     "seite": 11,
+     "schwere": "FEHLER"
+    },
+    {
+     "check_id": "L-01",
+     "beschreibung": "Rechtschreibfehler „Äquivalenzprinizip“ (richtig: „Äquivalenzprinzip“) im Kontext: „...Der Jahresnettobeitrag ergibt sich für Erwachsene nach dem Äquivalenzprinizip (Barwert der...“",
+     "seite": 35,
+     "schwere": "FEHLER"
+    },
+    {
+     "check_id": "L-01",
+     "beschreibung": "Rechtschreibfehler „Alterungsrückstelung“ (richtig: „Alterungsrückstellung“) im Kontext: „...Die Alterungsrückstelung wird prospektiv als Differenz des Barwerts der künftigen Leistung...“",
+     "seite": 44,
+     "schwere": "FEHLER"
+    }
+   ],
+   "hinweis": "15 Text-Chunks mit claude-sonnet-5-5 geprüft.",
+   "dauer_s": 9.06,
+   "llm_anfragen": 15
+  },
+  {
+   "id": "L-02",
+   "titel": "Nachrechnen der Beispiel- und Formelwerte",
+   "methode": "LLM",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "L-02",
+     "beschreibung": "„Jahresnettobeitrag P43 = GM * A43 / a43“: Das Dokument behauptet 4676,48, die Formel GM*A43/a43 ergibt mit den angegebenen Eingaben aber 4667,48.",
+     "seite": 92,
+     "schwere": "FEHLER"
+    }
+   ],
+   "hinweis": "15 Rechnungen in Python nachgerechnet und verglichen; 2 übersprungen (keine konkreten oder nicht im Dokument belegte Zahlen) (claude-sonnet-5-5).",
+   "dauer_s": 21.71,
+   "llm_anfragen": 5
+  },
+  {
+   "id": "L-03",
+   "titel": "Konsistenz Abschnitt ↔ Anlage/Anhang",
+   "methode": "LLM",
+   "status": "WARNUNG",
+   "befunde": [
+    {
+     "check_id": "L-03",
+     "beschreibung": "Widerspruch „Rechnungszinssatz Frauen“: Anlage 2.1, Tabelle der Rechnungszinssätze je Beobachtungseinheit nennt „Frauen 2,2 %“, Anlage 2.1, Historie dagegen „Frauen 2,3 % → 2,0 % (Änderung Nr. 15)“ – Laut Historie wurde der Zins für Frauen mit Änderung Nr. 15 auf 2,0 % gesenkt. Die Tabelle weist für Frauen aber 2,2 % aus. Eine spätere Änderung ist in der Historie nicht aufgeführt. Bei Männern stimmen Tabelle (2,7 %) und Historie überein.",
+     "seite": 60,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-03",
+     "beschreibung": "Widerspruch „Lage der rechnungsmäßigen Stornowahrscheinlichkeiten relativ zu den beobachteten Werten (Sicherheitsmarge)“: Anlage 2.2, Nachweis der Stornowahrscheinlichkeiten: Die rechnungsmäßigen Werte w̄neu liegen oberhalb der beobachteten Rohwerte nennt „oberhalb der beobachteten Rohwerte (als Sicherheitsmarge)“, Anlage 2.2, Begründung im selben Satz: Eine Überschätzung des Stornos würde die Vererbung überzeichnen (vgl. Abschnitt 5.1) dagegen „Überschätzung des Stornos ist zu vermeiden, die Sicherheitsmarge müsste daher unterhalb der beobachteten Werte liegen“ – Die Begründung passt nicht zur Richtung der Aussage. Ein Ansatz oberhalb der beobachteten Rohwerte ist eine Überschätzung des Stornos, die laut Begründung gerade vermieden werden soll. Eine Sicherheitsmarge müsste hier unterhalb der beobachteten Werte liegen.",
+     "seite": 61,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-03",
+     "beschreibung": "Widerspruch „Rechnungsmäßiger Grundkopfschaden Männer GM“: Anlage 2.3.3, Kopfabsatz (Seite 73): rechnungsmäßige Kopfschäden Kx = kx · G mit GM = ... EUR (Gleichung (42)) nennt „GM = 1910,0070 EUR“, Anlage 2.3.3, Abschnitt „Festsetzung und Sicherheitsnachweis der Grundkopfschäden“ (Seite 73): GM = ... EUR p. a. dagegen „GM = 1901,0070 EUR p. a.“ – Derselbe festgesetzte Grundkopfschaden der Männer wird auf derselben Seite mit zwei unterschiedlichen Werten angegeben (1910,0070 gegenüber 1901,0070; vermutlich Zahlendreher). GF ist an beiden Stellen identisch (2898,3813 EUR).",
+     "seite": 73,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-03",
+     "beschreibung": "Widerspruch „Sicherheitszuschlag σ“: Einleitender Text der Anlage 2.4: Sicherheitszuschlag festgesetzt auf σ = 5,0 % des Bruttobeitrags für alle Beobachtungseinheiten und Alter nennt „5,0 %“, Zuschlagstabelle der Anlage 2.4: Sicherheitszuschlag σ für Männer und Frauen dagegen „4,5 %“ – Derselbe Sicherheitszuschlag σ wird im Text mit 5,0 % und in der Tabelle für alle Spalten mit 4,5 % angegeben.",
+     "seite": 79,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-03",
+     "beschreibung": "Widerspruch „Vorzeichen von γx in der Formel der Alterungsrückstellung“: Abschnitt 5.1, Formel Vx(b) = G·Ax − [12·(1−(σ+Ωx))·b + γx]·ax nennt „+γx im Klammerausdruck“, Abschnitt 5.1, Aufzählung und Rekursion (Jahresbetrag nach Abzug der laufenden Zuschläge); Anhang 5, Schritt 4 (Beitragsformel) dagegen „−γx, also 12·(1−(σ+Ωx))·b − γx“ – Die Formel verwendet +γx, die Erläuterung als „Zillmerprämie“, die Rekursion und die Beitragsformel in Anhang 5 verwenden dagegen −γx. Das Vorzeichen von γx ist daher nicht einheitlich.",
+     "seite": 44,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-03",
+     "beschreibung": "Widerspruch „Jahresnettobeitrag P43“: Anhang 5, Schritt 3: Rechenansatz P43 = GM·A43 = 1901,0070 · 44,1833 nennt „Produkt ≈ 83.992,8 EUR“, Anhang 5, Schritt 3: angegebenes Ergebnis dagegen „4676,48 EUR p. a.“ – Die eingesetzten Zahlen ergeben ca. 83.993 EUR, nicht 4676,48 EUR. Das ist auch der Wert, mit dem die Bruttobeitragsformel in Schritt 4 rechnet und der zu b43 = 529,01 EUR führt.",
+     "seite": 92,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-03",
+     "beschreibung": "Widerspruch „Jahresnettobeitrag P43 im Beispiel: Ergebnis passt nicht zu den eingesetzten Werten“: Schritt 3: P43 = GM · A43 (Gleichung (19)), eingesetzt mit A43 = 44,1833 und a43 = 17,9953 aus Schritt 2 (GM · A43 / a43) nennt „1901,0070 · 44,1833 / 17,9953 ≈ 4667,48 EUR p. a.“, Schritt 3: ausgewiesenes Ergebnis dagegen „4676,48 EUR p. a.“ – Mit den eingesetzten Zahlen und dem Rentenbarwert a43 = 17,9953 ergibt sich rechnerisch etwa 4667,48 EUR. Ausgewiesen sind 4676,48 EUR, also ein Ziffernvertauscher. Der Wert passt nicht zur genannten Formel. Rein als Produkt GM · A43 ergäben sich sogar etwa 83.993 EUR.",
+     "seite": 92,
+     "schwere": "WARNUNG"
+    }
+   ],
+   "hinweis": "15 Teil-Paare mit claude-sonnet-5-5 verglichen.",
+   "dauer_s": 0.33,
+   "llm_anfragen": 15
+  },
+  {
+   "id": "L-04",
+   "titel": "Plausibilität der Normzitate",
+   "methode": "LLM",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "L-04",
+     "beschreibung": "Normzitat „§ 4 VAG“ passt nicht zum Sachverhalt – einschlägig wäre § 4 KVAV. (Der Höchstrechnungszins von 3,5 % ist in der KVAV (Rechnungszins) geregelt. § 4 VAG regelt einen anderen Gegenstand.)",
+     "seite": 16,
+     "schwere": "FEHLER"
+    },
+    {
+     "check_id": "L-04",
+     "beschreibung": "Normzitat „§ 146 Abs. 2 VAG“ ist fraglich: Es ist unklar, ob die Anforderung monoton nicht fallender Beiträge im zitierten Absatz geregelt ist oder in einem anderen Absatz bzw. in der KVAV.",
+     "seite": 24,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-04",
+     "beschreibung": "Normzitat „§ 8 Abs. 5 KVAV“ ist fraglich: Es ist unsicher, ob das Entfallen der Standardtarif-Komponente nach dem 65. Lebensjahr in Abs. 5 geregelt ist.",
+     "seite": 30,
+     "schwere": "WARNUNG"
+    }
+   ],
+   "hinweis": "72 Normzitate mit claude-sonnet-5-5 bewertet.",
+   "dauer_s": 24.84,
+   "llm_anfragen": 3
+  },
+  {
+   "id": "L-05",
+   "titel": "Vision-Prüfung des Formelsatzes",
+   "methode": "LLM",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "L-05",
+     "beschreibung": "Formel „Gleichung (30): V_x(b) = G·A_x − [12·(1−(σ+Ω_x))·b + γ_x]·a_x“: In Gleichung (30) steht der Zuschlag γ_x innerhalb der eckigen Klammer mit positivem Vorzeichen (+γ_x). Legende und Gleichung (31) ziehen γ_x dagegen ab. – Die Legende zu (30) beschreibt die Zillmerprämie als 12(1−(σ+Ω_x))·b − γ_x, also den Jahresbetrag des Beitrags nach Abzug der laufenden Zuschläge. Gleichung (31) definiert P_x^Z = 12·(1−(σ+Ω_x))·b − γ_x. Die Klammer in (30) müsste daher 12·(1−(σ+Ω_x))·b − γ_x lauten. Das Vorzeichen von γ_x ist derselbe Term an derselben Stelle mit entgegengesetztem Vorzeichen.",
+     "seite": 44,
+     "schwere": "FEHLER"
+    },
+    {
+     "check_id": "L-05",
+     "beschreibung": "Formel „G^M = 1910,0070 EUR (Einleitungstext, Kopfschaden K_x = k_x · G)“: Der Grundkopfschaden der Männer wird im Einleitungstext mit 1910,0070 EUR angegeben, in Gleichung (42) und in der Tabelle dagegen mit 1901,0070 EUR (Ziffernvertauschung). – Gleichung (42) und die Spalte G^rech der Tabelle nennen übereinstimmend G^M = 1901,0070 EUR. Auch die Angabe, dass G^ext (1829,93) den Ansatz um 3,7 % unterschreitet, passt nur zu 1901,0070 (1829,93/1901,0070 ≈ 0,963). Der Wert 1910,0070 im Einleitungstext widerspricht dem also.",
+     "seite": 73,
+     "schwere": "FEHLER"
+    },
+    {
+     "check_id": "L-05",
+     "beschreibung": "Formel „σ = 5,0 % (Gl. 43)“: Die Gleichung setzt den Sicherheitszuschlag auf 5,0 %, die Übersichtstabelle derselben Seite nennt für σ in allen Spalten 4,5 %. – Der Text und Gleichung (43) legen σ für alle Beobachtungseinheiten und Alter auf 5,0 % des Bruttobeitrags fest. Die Tabellenzeile 'Sicherheitszuschlag σ' zeigt dagegen für Männer und Frauen, x ≤ 64 und x ≥ 65, durchgehend 4,5 %. Derselbe Parameter hat damit zwei verschiedene Werte. Welcher Wert richtig ist, lässt sich auf dieser Seite nicht entscheiden, der Widerspruch ist aber sichtbar.",
+     "seite": 79,
+     "schwere": "FEHLER"
+    },
+    {
+     "check_id": "L-05",
+     "beschreibung": "Formel „P_43 = (G^M · A_43)/a_43 = (1901,0070 · 44,1833)/17,9953 = 4676,48 EUR p. a.“: Das Ergebnis passt nicht zu den eingesetzten Werten. Die Rechnung ergibt etwa 4667,48 EUR, abgedruckt ist 4676,48 EUR (vertauschte Ziffern). – 44,1833/17,9953 ≈ 2,45527, und 1901,0070 · 2,45527 ≈ 4667,48. Der Wert 4676,48 weicht um rund 9 EUR ab, das ist keine Rundungsdifferenz. Der Wert geht nicht in Schritt 4 ein, denn b_43 = 529,01 ist mit den Barwerten konsistent. Es handelt sich also um einen isolierten Rechenfehler im Ergebnis von Schritt 3.",
+     "seite": 92,
+     "schwere": "FEHLER"
+    }
+   ],
+   "hinweis": "22 Formelseiten als Bild geprüft (claude-sonnet-5-5).",
+   "dauer_s": 2.67,
+   "llm_anfragen": 22
+  },
+  {
+   "id": "L-06",
+   "titel": "Grafik-Tabellen-Abgleich",
+   "methode": "LLM",
+   "status": "FEHLER",
+   "befunde": [
+    {
+     "check_id": "L-06",
+     "beschreibung": "Grafik widerspricht den Tabellenwerten – Kurve „Frauen“ weicht selbst von der am besten passenden Spalte (Anlage 2.3.3 – Rechnungsmäßige normierte Kopfschadenprofile kx(…, Spalte „k“ (Nr. 3)) im Median um 50 % ab (x=50: Grafik ≈1,85, Tabelle 1,2294; x=30: Grafik ≈1,5, Tabelle 0,9971; x=80: Grafik ≈4,65, Tabelle 3,0942).",
+     "seite": 75,
+     "schwere": "FEHLER"
+    }
+   ],
+   "hinweis": "2 Diagrammseite(n) blind abgelesen (claude-sonnet-5-5), 4 Kurven deterministisch den Tabellenspalten zugeordnet (krass = Median-Abweichung > 20 %). Ablesegenauigkeit: S.75: x-Achse: Alter 20 bis 110 mit Gitterlinien alle 10 Jahre, Kurven von Alter 21 bis 110. y-Achse: normierter Kopfschaden k_x, Gitterlinien bei ganzen Zahlen 1 bis 6. Ablesegenauigkeit ca. ±0,05 bis ±0,1 in y. Die Punkte der beiden Kurven liegen dicht beieinander und überlagern sich bei etwa Alter 60 bis 62, wo sich die Kurven kreuzen. Bei Alter 90 bis 110 verlaufen beide Kurven als horizontale Plateaus und sind dort gut ablesbar. | S.78: Die x-Achse (Alter) reicht von ca. 12 bis 118 mit Beschriftung alle 10 Jahre ab 20 bis ",
+   "dauer_s": 0.01,
+   "llm_anfragen": 2
+  }
+ ]
+}

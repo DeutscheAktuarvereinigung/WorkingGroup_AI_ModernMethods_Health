@@ -1,0 +1,265 @@
+{
+ "dokument": "fehlerfrei",
+ "laufzeit_s": 62.51715874671936,
+ "ergebnisse": [
+  {
+   "id": "V-01",
+   "titel": "Kaputte Verweise („??“)",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "93 Seiten durchsucht.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-02",
+   "titel": "Existenz interner Verweise",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "252 Teil-Verweise und 35 Gleichungs-Verweise geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-03",
+   "titel": "Inhaltsverzeichnis (Titel und Seitenzahlen)",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "65 IHV-Einträge gegen Überschriften geprüft (Seitenversatz +1).",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-04",
+   "titel": "Vollständigkeit des Symbolverzeichnisses",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "140 verschiedene Symbole gegen 59 Glossar-Einträge geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-05",
+   "titel": "Tabellen-Identitäten und Rechnungszins",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "180 Zeilen-Identitäten geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-06",
+   "titel": "Monotonie der Beitragstabellen",
+   "methode": "deterministisch",
+   "status": "WARNUNG",
+   "befunde": [
+    {
+     "check_id": "V-06",
+     "beschreibung": "Anhang 3, Spalte b_x (Spalte 5): Wert fällt von Alter 64 (814,70) auf Alter 65 (813,43). Kann systembedingt sein, sollte aber geprüft werden.",
+     "seite": 90,
+     "schwere": "WARNUNG"
+    }
+   ],
+   "hinweis": "356 Altersübergänge geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-07",
+   "titel": "Abgleich mit Referenzwerten (CSV)",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "24 Spalten den Referenz-CSVs zugeordnet, 2160 Zellen verglichen.",
+   "dauer_s": 0.03,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-08",
+   "titel": "Konsistenz benannter Parameter",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "14 Parameter-Zuweisungen zu 12 Symbolen geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-09",
+   "titel": "Gesetzes- und Paragrafen-Prüfung",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "6 Normbezüge bzw. Zuschlagsangaben geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-10",
+   "titel": "Referenzen auf Rahmen-Berechnungsgrundlagen",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "8 Referenzen gegen ein Register mit 3 Einträgen geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-11",
+   "titel": "Versions- und Stichtagskonsistenz",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "99 Nummern- und 92 Datumsangaben geprüft (Dokumentstand: Nr. 17); Historie bis Nr. 17.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-12",
+   "titel": "Vollständigkeit und Wertebereiche der Alterstabellen",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "9 Alterstabellen mit 3473 Werten auf Lücken, Endalter und Wertebereiche geprüft.",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "V-13",
+   "titel": "Abgleich mit der Referenzdatenbank (SQLite)",
+   "methode": "deterministisch",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "8 Spalten der Datenbank zugeordnet, 720 Zellen verglichen (rechnungsgrundlagen.db).",
+   "dauer_s": 0.0,
+   "llm_anfragen": 0
+  },
+  {
+   "id": "L-01",
+   "titel": "Rechtschreibprüfung",
+   "methode": "LLM",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "15 Text-Chunks mit claude-sonnet-5-5 geprüft.",
+   "dauer_s": 8.48,
+   "llm_anfragen": 15
+  },
+  {
+   "id": "L-02",
+   "titel": "Nachrechnen der Beispiel- und Formelwerte",
+   "methode": "LLM",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "15 Rechnungen in Python nachgerechnet und verglichen; 4 übersprungen (keine konkreten oder nicht im Dokument belegte Zahlen) (claude-sonnet-5-5).",
+   "dauer_s": 20.15,
+   "llm_anfragen": 5
+  },
+  {
+   "id": "L-03",
+   "titel": "Konsistenz Abschnitt ↔ Anlage/Anhang",
+   "methode": "LLM",
+   "status": "WARNUNG",
+   "befunde": [
+    {
+     "check_id": "L-03",
+     "beschreibung": "Widerspruch „Lage der rechnungsmäßigen Stornowahrscheinlichkeiten relativ zu den beobachteten Werten (Richtung der Sicherheitsmarge)“: Anlage 2.2, Satz zu ̄wneu: Die rechnungsmäßigen Werte liegen oberhalb der beobachteten Rohwerte nennt „̄wneu oberhalb der beobachteten Rohwerte“, Anlage 2.2, Begründung im selben Satz: Eine Überschätzung des Stornos würde die Vererbung überzeichnen dagegen „Überschätzung des Stornos soll vermieden werden, die Marge müsste also unterhalb der Rohwerte liegen“ – Die Begründung passt nicht zur Richtung der Aussage. Läge ̄wneu über den beobachteten Werten, wäre das Storno überschätzt und die Vererbung überzeichnet. Das ist genau das, was die Sicherheitsmarge vermeiden soll. Die Marge müsste daher unterhalb der Rohwerte liegen.",
+     "seite": 61,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-03",
+     "beschreibung": "Widerspruch „Jahresnettobeitrag P43 (Gleichung (19))“: Schritt 3: P43 = GM · A43 = 1901,0070 · 44,1833 nennt „Das Produkt 1901,0070 · 44,1833 ergibt rechnerisch ca. 83.993 EUR. Dieser Wert wird auch im Zähler von Schritt 4 verwendet und führt dort zu b43 = 529,01 EUR/Monat.“, Schritt 3: Ergebnis der Formel dagegen „4667,48 EUR p. a.“ – Das genannte Ergebnis passt nicht zur angegebenen Formel mit den eingesetzten Zahlen. In Schritt 4 wird dasselbe Produkt (≈ 83.993) verwendet, sodass sich 529,01 EUR ergeben. Mit 4667,48 im Zähler käme ein deutlich kleinerer Bruttobeitrag heraus.",
+     "seite": 92,
+     "schwere": "WARNUNG"
+    }
+   ],
+   "hinweis": "15 Teil-Paare mit claude-sonnet-5-5 verglichen.",
+   "dauer_s": 0.72,
+   "llm_anfragen": 15
+  },
+  {
+   "id": "L-04",
+   "titel": "Plausibilität der Normzitate",
+   "methode": "LLM",
+   "status": "WARNUNG",
+   "befunde": [
+    {
+     "check_id": "L-04",
+     "beschreibung": "Normzitat „§ 8 Abs. 3 Satz 3 KVAV“ ist fraglich: Der Paragraf passt thematisch (Abschlusskostenzuschlag). Absatz und Satz kann ich nicht sicher verifizieren.",
+     "seite": 28,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-04",
+     "beschreibung": "Normzitat „§ 8 Abs. 5 KVAV“ ist fraglich: Der Paragraf passt thematisch zu den Zuschlägen. Den Absatz zum Wegfall der Standardtarif-Komponente ab 65 kann ich nicht sicher verifizieren.",
+     "seite": 30,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-04",
+     "beschreibung": "Normzitat „§ 13 Abs. 2 KVAV“ ist fraglich: Die Behandlung entfallender Leistungsbereiche liegt im Sachbereich von §§ 12/13 KVAV. Die Absatzzuordnung ist nicht sicher.",
+     "seite": 40,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-04",
+     "beschreibung": "Normzitat „§ 3 KVAV“ ist fraglich: Der Bezug zur prospektiven Berechnung der Alterungsrückstellung ist plausibel, die genaue Zuordnung zu § 3 KVAV aber nicht sicher.",
+     "seite": 44,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-04",
+     "beschreibung": "Normzitat „§ 18 KVAV“ ist fraglich: Die Bilanzdeckungsrückstellung als Mittelwert der Jahrestage ist nicht sicher in § 18 KVAV verortet. Möglich sind auch andere Normen aus KVAV oder RechVersV.",
+     "seite": 45,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-04",
+     "beschreibung": "Normzitat „§ 14 Abs. 4 KVAV“ ist fraglich: Die Vorschrift gehört thematisch zum Übertragungswert. Ob die gesonderte Führung des aufgebauten Teils genau in Abs. 4 steht, ist nicht sicher.",
+     "seite": 47,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-04",
+     "beschreibung": "Normzitat „§ 155 Abs. 3 VAG“ ist fraglich: Der Ausschluss der Anpassung bei erkennbar unzureichender Kalkulation steht möglicherweise in einem anderen Absatz von § 155 VAG. Der genaue Aufbau ist nicht sicher.",
+     "seite": 53,
+     "schwere": "WARNUNG"
+    },
+    {
+     "check_id": "L-04",
+     "beschreibung": "Normzitat „§ 2 Abs. 3 KVAV“ ist fraglich: Die Vorschrift betrifft Sicherheitsmargen in den Rechnungsgrundlagen. Die genaue Absatzzuordnung ist unsicher.",
+     "seite": 73,
+     "schwere": "WARNUNG"
+    }
+   ],
+   "hinweis": "73 Normzitate mit claude-sonnet-5-5 bewertet.",
+   "dauer_s": 32.16,
+   "llm_anfragen": 3
+  },
+  {
+   "id": "L-05",
+   "titel": "Vision-Prüfung des Formelsatzes",
+   "methode": "LLM",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "22 Formelseiten als Bild geprüft (claude-sonnet-5-5).",
+   "dauer_s": 0.0,
+   "llm_anfragen": 22
+  },
+  {
+   "id": "L-06",
+   "titel": "Grafik-Tabellen-Abgleich",
+   "methode": "LLM",
+   "status": "BESTANDEN",
+   "befunde": [],
+   "hinweis": "2 Diagrammseite(n) blind abgelesen (claude-sonnet-5-5), 4 Kurven deterministisch den Tabellenspalten zugeordnet (krass = Median-Abweichung > 20 %). Ablesegenauigkeit: S.75: x-Achse von ca. 12 bis 118 mit Beschriftung in 10er-Schritten (20 bis 110), y-Achse (normierter Kopfschaden k_x) von ca. 0,3 bis 6,6 mit Gitterlinien bei jeweils 1 Einheit. Die Kurven sind mit Punkten je Altersjahr von 21 bis 110 dargestellt. Die Ablesegenauigkeit liegt bei etwa ±0,05 bis ±0,1 in y. Im Bereich 25 bis 42 liegen beide Kurven nahezu übereinander bei ca. 1, sodass sie dort kaum unterscheidbar sind. Ab ca. 88 verlaufen beide Kurven als Plateau (Männer ca. 6,1; Frauen ca. 3,4). | S.78: Die x-Achse (Alter) reich",
+   "dauer_s": 0.0,
+   "llm_anfragen": 2
+  }
+ ]
+}
