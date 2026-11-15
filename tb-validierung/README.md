@@ -33,11 +33,13 @@ tb-validierung/
 │   │   └── out/                     Referenzwerte: 4 CSV-Dateien + rechnungsgrundlagen.db
 │   ├── tex/                         LaTeX-Quellen der fehlerfreien Fassung (inkl. generierter gen/)
 │   └── tex_fehlerhaft/              LaTeX-Quellen der fehlerhaften Fassung (Diff zu tex/ = die Fehler)
-└── validierungsnotebook/
-    ├── TB_Validierung.ipynb         das Prüf-Notebook (19 Checks) mit gespeichertem Nachweis-Lauf
-    ├── llm_cache.json               Antwort-Cache: Wiederholungsläufe kosten keine API-Aufrufe
-    ├── pruefbericht_TB_VitalPlus_fehlerhaft.json   Prüfbericht des Nachweis-Laufs (21 F, 8 W)
-    └── pruefbericht_TB_VitalPlus.json              Gegenprobe fehlerfreie Fassung (0 F, 5 W)
+├── validierungsnotebook/
+│   ├── TB_Validierung.ipynb         das Prüf-Notebook (19 Checks) mit gespeichertem Nachweis-Lauf
+│   ├── llm_cache.json               Antwort-Cache: Wiederholungsläufe kosten keine API-Aufrufe
+│   ├── normtexte.json               gespeicherte Gesetzestexte (Ersatz für L-04 ohne Internet)
+│   ├── pruefbericht_TB_VitalPlus_fehlerhaft.json   Prüfbericht des Nachweis-Laufs (21 F, 11 W)
+│   └── pruefbericht_TB_VitalPlus.json              Gegenprobe fehlerfreie Fassung (0 F, 6 W)
+└── gui/                             Demo-Oberfläche (Streamlit) für Live-Vorführungen, siehe gui/README.md
 ```
 
 ## Prüfkatalog (19 Checks)
@@ -46,7 +48,9 @@ tb-validierung/
 reproduzierbar, laufen auch ohne API-Schlüssel: tote und fehlende interne
 Verweise, Inhaltsverzeichnis-Abgleich, Vollständigkeit des
 Symbolverzeichnisses, rechnerische Tabellen-Identitäten und implizierter
-Rechnungszins, Beitragsmonotonie, zellgenauer Abgleich mit Referenzwerten
+Rechnungszins, Beitragsmonotonie (Rückgänge, die die TB selbst begründet –
+etwa durch den Wegfall von Zuschlägen ab Alter 65 –, gelten als plausibel),
+zellgenauer Abgleich mit Referenzwerten
 (CSV) und Referenzdatenbank (SQLite), Konsistenz benannter Parameter,
 Normzitat-Wissensbasis, Rahmen-TB-Register, Versionskonsistenz,
 Vollständigkeit der Alterstabellen.
@@ -54,9 +58,11 @@ Vollständigkeit der Alterstabellen.
 **6 LLM-gestützte Prüfungen (L-01…L-06)** – dort, wo Sprach-, Kontext- oder
 Bildverständnis nötig ist: Rechtschreibung, Nachrechnen der
 Beispielrechnungen (das Modell extrahiert nur, Python rechnet nach),
-Konsistenz Abschnitt ↔ Anlage, Plausibilität der Normzitate, Vision-Prüfung
-des Formelsatzes (formelhaltige Seiten als Bild – erkennt Fehler, die im
-PDF-Text-Layer unsichtbar sind) sowie der Grafik-Tabellen-Abgleich.
+Konsistenz Abschnitt ↔ Anlage, Prüfung der Normzitate am amtlichen Wortlaut
+(das Modell schlägt die zitierten Paragrafen per Werkzeugaufruf selbst auf
+gesetze-im-internet.de nach), Vision-Prüfung des Formelsatzes
+(formelhaltige Seiten als Bild – erkennt Fehler, die im PDF-Text-Layer
+unsichtbar sind) sowie der Grafik-Tabellen-Abgleich.
 
 Gegen typische LLM-Schwächen ist das Notebook mehrfach abgesichert:
 strukturierte Antwortschemata, Grounding (gemeldete Wörter und Zahlen
@@ -72,14 +78,17 @@ Erprobung übersah es so selbst eine um 50 % verfälschte Kurve.
 | | fehlerhafte TB | fehlerfreie TB (Gegenprobe) |
 |---|---|---|
 | gefundene dokumentierte Fehler | **13 / 13** | – |
-| Gesamtbefunde | 21 Fehler, 8 Warnungen | **0 Fehler**, 5 Warnungen |
+| Gesamtbefunde | 21 Fehler, 11 Warnungen | **0 Fehler**, 6 Warnungen |
 
 Neun der 13 Fehler findet bereits die deterministische Ebene; zwei Befunde
 (Vorzeichenfehler im Formelsatz, verfälschte Grafik-Kurve) sind nur über
-die bildbasierten Prüfschritte als Fehler klassifizierbar. Die fünf
-Warnungen der Gegenprobe sind Sichtungshinweise ohne Fehlercharakter.
-Der maßgebliche Lauf (Modell: `claude-sonnet-5`, Juli 2026) ist mitsamt
-Ausgaben im Notebook gespeichert und als JSON-Prüfbericht exportiert.
+die bildbasierten Prüfschritte als Fehler klassifizierbar. Die sechs
+Warnungen der Gegenprobe sind Sichtungshinweise ohne Fehlercharakter; fünf
+davon betreffen Normzitate, deren Absatz laut amtlichem Wortlaut nicht
+genau passt (z. B. § 10 Abs. 1 statt Abs. 5 KVAV). Der maßgebliche Lauf
+(Modell: `claude-sonnet-5`, Juli 2026; L-04 und V-06 im November 2026
+erneuert) ist mitsamt Ausgaben im Notebook gespeichert und als
+JSON-Prüfbericht exportiert.
 
 ## Voraussetzungen und Setup
 
@@ -116,6 +125,13 @@ Der Antwort-Cache (`llm_cache.json`) macht Wiederholungsläufe kostenlos.
 > `2_Synthetische_TB` des Entwicklungsprojekts (heute:
 > `synthetische-tb`). Bei einem frischen Lauf zeigen die Ausgaben die
 > aktuellen Pfade.
+
+**Live-Vorführung (Demo-Oberfläche):** `gui/` enthält eine
+Streamlit-Oberfläche, die die Checks des Notebooks unverändert ausführt
+und Schritt für Schritt auf großer Leinwand zeigt – mit Notfallschalter,
+der die gespeicherten Antworten ohne Internet abspielt. Start nach
+`pip install streamlit` mit `python -m streamlit run app.py` im Ordner
+`gui/`; Einzelheiten und Regieblatt in [gui/README.md](gui/README.md).
 
 **Reproduzieren (vollständige Kette, optional):** Alle Schritte aus dem
 Ordner `synthetische-tb/` heraus:

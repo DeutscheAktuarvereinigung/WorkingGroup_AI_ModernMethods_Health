@@ -4,7 +4,7 @@
   "modell": "claude-sonnet-5",
   "zusammenfassung": {
     "fehler": 21,
-    "warnungen": 8,
+    "warnungen": 11,
     "checks": 19,
     "uebersprungen": 0
   },
@@ -32,7 +32,7 @@
       "methode": "deterministisch",
       "status": "BESTANDEN",
       "hinweis": "252 Teil-Verweise und 35 Gleichungs-Verweise geprüft.",
-      "dauer_s": 0.02,
+      "dauer_s": 0.01,
       "befunde": []
     },
     {
@@ -58,7 +58,7 @@
       "methode": "deterministisch",
       "status": "FEHLER",
       "hinweis": "141 verschiedene Symbole gegen 58 Glossar-Einträge geprüft.",
-      "dauer_s": 0.03,
+      "dauer_s": 0.01,
       "befunde": [
         {
           "schwere": "FEHLER",
@@ -94,18 +94,13 @@
       "kategorie": "dokumentintern",
       "methode": "deterministisch",
       "status": "WARNUNG",
-      "hinweis": "356 Altersübergänge geprüft.",
+      "hinweis": "356 Altersübergänge geprüft. 1 Rückgang (höchstens 0,16 %) beim in der TB begründeten Übergang 64 → 65 (Begründung Seite 36) – plausibel, nicht gemeldet.",
       "dauer_s": 0.0,
       "befunde": [
         {
           "schwere": "WARNUNG",
           "seite": 89,
-          "beschreibung": "Anhang 3, Spalte b_x (Spalte 3): Wert fällt von Alter 50 (653,33) auf Alter 51 (651,63). Kann systembedingt sein, sollte aber geprüft werden."
-        },
-        {
-          "schwere": "WARNUNG",
-          "seite": 90,
-          "beschreibung": "Anhang 3, Spalte b_x (Spalte 5): Wert fällt von Alter 64 (814,70) auf Alter 65 (813,43). Kann systembedingt sein, sollte aber geprüft werden."
+          "beschreibung": "Anhang 3, Spalte b_x (Spalte 3): Wert fällt von Alter 50 (653,33) auf Alter 51 (651,63). Die TB begründet an keiner Stelle einen Rückgang bei diesem Übergang. Bitte prüfen."
         }
       ]
     },
@@ -116,7 +111,7 @@
       "methode": "deterministisch",
       "status": "FEHLER",
       "hinweis": "24 Spalten den Referenz-CSVs zugeordnet, 2160 Zellen verglichen.",
-      "dauer_s": 0.59,
+      "dauer_s": 0.07,
       "befunde": [
         {
           "schwere": "FEHLER",
@@ -137,7 +132,7 @@
       "methode": "deterministisch",
       "status": "FEHLER",
       "hinweis": "14 Parameter-Zuweisungen zu 12 Symbolen geprüft.",
-      "dauer_s": 0.01,
+      "dauer_s": 0.0,
       "befunde": [
         {
           "schwere": "FEHLER",
@@ -153,7 +148,7 @@
       "methode": "deterministisch",
       "status": "FEHLER",
       "hinweis": "6 Normbezüge bzw. Zuschlagsangaben geprüft.",
-      "dauer_s": 0.01,
+      "dauer_s": 0.0,
       "befunde": [
         {
           "schwere": "FEHLER",
@@ -199,7 +194,7 @@
       "methode": "deterministisch",
       "status": "BESTANDEN",
       "hinweis": "9 Alterstabellen mit 3473 Werten auf Lücken, Endalter und Wertebereiche geprüft.",
-      "dauer_s": 0.01,
+      "dauer_s": 0.0,
       "befunde": []
     },
     {
@@ -209,7 +204,7 @@
       "methode": "deterministisch",
       "status": "FEHLER",
       "hinweis": "8 Spalten der Datenbank zugeordnet, 720 Zellen verglichen (rechnungsgrundlagen.db).",
-      "dauer_s": 0.02,
+      "dauer_s": 0.0,
       "befunde": [
         {
           "schwere": "FEHLER",
@@ -225,7 +220,7 @@
       "methode": "LLM",
       "status": "FEHLER",
       "hinweis": "15 Text-Chunks mit claude-sonnet-5 geprüft.",
-      "dauer_s": 0.06,
+      "dauer_s": 0.02,
       "befunde": [
         {
           "schwere": "FEHLER",
@@ -251,7 +246,7 @@
       "methode": "LLM",
       "status": "FEHLER",
       "hinweis": "7 Rechnungen in Python nachgerechnet und verglichen; 2 übersprungen (keine konkreten oder nicht im Dokument belegte Zahlen) (claude-sonnet-5).",
-      "dauer_s": 0.01,
+      "dauer_s": 0.0,
       "befunde": [
         {
           "schwere": "FEHLER",
@@ -267,7 +262,7 @@
       "methode": "LLM",
       "status": "WARNUNG",
       "hinweis": "15 Teil-Paare mit claude-sonnet-5 verglichen.",
-      "dauer_s": 0.06,
+      "dauer_s": 0.03,
       "befunde": [
         {
           "schwere": "WARNUNG",
@@ -302,18 +297,38 @@
       "kategorie": "dokumentextern",
       "methode": "LLM",
       "status": "FEHLER",
-      "hinweis": "73 Normzitate mit claude-sonnet-5 bewertet.",
+      "hinweis": "73 Normzitate mit claude-sonnet-5 am amtlichen Wortlaut geprüft (nachgeschlagen per Werkzeugaufruf auf gesetze-im-internet.de).",
       "dauer_s": 0.0,
       "befunde": [
         {
           "schwere": "FEHLER",
           "seite": 16,
-          "beschreibung": "Normzitat „§ 4 VAG“ passt nicht zum Sachverhalt – einschlägig wäre § 4 KVAV. (Der Höchstrechnungszins für die Krankenversicherung ist speziell in § 4 KVAV geregelt, nicht im allgemeinen Aufsichtsrecht des VAG. Der systematische Kontext (§2, §5, §6, §7, §8, §9, §10 KVAV) zeigt, dass hier § 4 KVAV gemeint sein muss.)"
+          "beschreibung": "Normzitat „§ 4 VAG“ passt nicht zum Sachverhalt – einschlägig wäre § 4 KVAV. (§ 4 VAG regelt die Feststellung der Aufsichtspflicht durch die Aufsichtsbehörde, nicht den Höchstrechnungszins; dieser ist in § 4 KVAV mit der Grenze von 3,5 % geregelt.)"
         },
         {
           "schwere": "WARNUNG",
-          "seite": 30,
-          "beschreibung": "Normzitat „§ 154 VAG“ ist fraglich: Die Begrenzung der Beitragshöhe im Basistarif wird nach meiner Kenntnis eher in § 152/§153 VAG (Standardtarif/Basistarif) geregelt; § 154 VAG könnte einen anderen, benachbarten Regelungsgegenstand betreffen. Die genaue Abgrenzung ist mir nicht sicher genug für 'falsch'."
+          "seite": 24,
+          "beschreibung": "Normzitat „§ 146 Abs. 2 VAG“: Der Gesetzestext trägt die Aussage nicht ausdrücklich. (§ 146 Abs. 2 VAG regelt, dass Neugeschäftsprämien nicht niedriger sein dürfen als vergleichbare Altbestandsprämien ohne Alterungsrückstellung, trifft aber keine ausdrückliche Aussage zur Monotonie der Beiträge über das Alter. Die Vorschrift gehört zwar zum Sachgebiet der Prämienkalkulation in der substitutiven Krankenversicherung, stützt die konkrete Monotonisierungsaussage jedoch nicht wörtlich.)"
+        },
+        {
+          "schwere": "WARNUNG",
+          "seite": 33,
+          "beschreibung": "Normzitat „§ 10 Abs. 1 KVAV“: richtiger Paragraf, aber andere Fundstelle. Laut Gesetzestext steht der Sachverhalt in § 10 Abs. 5 KVAV. (Abs. 1 regelt allgemein die Grundsätze der Prämienberechnung; die Verweisung auf die Formeln des Abschnitts A der Anlage 1 für den Neuzugang findet sich ausdrücklich erst in Abs. 5.)"
+        },
+        {
+          "schwere": "WARNUNG",
+          "seite": 40,
+          "beschreibung": "Normzitat „§ 13 Abs. 2 KVAV“: richtiger Paragraf, aber andere Fundstelle. Laut Gesetzestext steht der Sachverhalt in § 13 Abs. 3 KVAV. (Der Teilstorno bei Wegfall eines Leistungsbereichs ist ausdrücklich in Abs. 3 geregelt, während Abs. 2 Sonderregeln für Basistarif-Wechsler innerhalb der ersten 18 Monate betrifft.)"
+        },
+        {
+          "schwere": "WARNUNG",
+          "seite": 46,
+          "beschreibung": "Normzitat „§ 150 Abs. 1 VAG“: Der Gesetzestext trägt die Aussage nicht ausdrücklich. (Die Ansammlung des gesetzlichen Beitragszuschlags in einer Zusatzrückstellung wird durch § 149 VAG geregelt, wonach der Zuschlag der Alterungsrückstellung jährlich direkt zuzuführen ist; § 150 Abs. 1 VAG betrifft dagegen die Gutschrift von Überzinserträgen, nicht die Ansammlung des Zuschlags selbst.)"
+        },
+        {
+          "schwere": "WARNUNG",
+          "seite": 47,
+          "beschreibung": "Normzitat „§ 14 Abs. 4 KVAV“: Der Gesetzestext trägt die Aussage nicht ausdrücklich. (Abs. 4 regelt die Beschränkung des Übertragungswerts bei Kündigung eines vor 2009 geschlossenen Vertrags und gleichzeitigem Abschluss bei einem anderen Krankenversicherer, nicht aber die im Text beschriebene gesonderte Führung der Alterungsrückstellung bei einem Tarifwechsel innerhalb desselben Unternehmens. Die TB-Aussage ist dem gleichen Sachgebiet (Portabilität der Alterungsrückstellung) zuzuordnen, aber nicht wörtlich durch Abs. 4 gedeckt.)"
         }
       ]
     },
@@ -324,7 +339,7 @@
       "methode": "LLM",
       "status": "FEHLER",
       "hinweis": "22 Formelseiten als Bild geprüft (claude-sonnet-5).",
-      "dauer_s": 3.51,
+      "dauer_s": 1.44,
       "befunde": [
         {
           "schwere": "FEHLER",
@@ -350,7 +365,7 @@
       "methode": "LLM",
       "status": "FEHLER",
       "hinweis": "2 Diagrammseite(n) blind abgelesen (claude-sonnet-5), 4 Kurven deterministisch den Tabellenspalten zugeordnet (krass = Median-Abweichung > 20 %). Ablesegenauigkeit: S.75: Die y-Achse ist von 1 bis 6 in Schritten von 1 beschriftet, mit Gitterlinien auf jeder ganzen Einheit; eine Zwischenschätzung auf ca. 0,1 ist möglich. Die x-Achse ist von 20 bis 110 in Schritten von 10 beschriftet. Beide Kurven verlaufen im Bereich x=20-40 nahe beieinander und sind dort schwer präzise zu trennen; ab x=60 werden die Kurven deutlicher unterscheidbar. Ab ca. x=90 laufen beide Kurven in ein Plateau, das gut ablesbar ist. Die Ablesegenauigkeit ist im flachen Bereich (20-50) geringer als im steigenden Bereich (60",
-      "dauer_s": 0.67,
+      "dauer_s": 0.29,
       "befunde": [
         {
           "schwere": "FEHLER",
