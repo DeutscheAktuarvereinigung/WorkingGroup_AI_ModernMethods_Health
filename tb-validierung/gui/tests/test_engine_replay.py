@@ -476,28 +476,72 @@ def test_fehler_mitten_im_antwortstrom():
     assert ergebnis == {"fehler": []} and zaehler["n"] == 3 and lauf.live_aufrufe == 3
 
 
+def _verbindungsfehler(anf, ursache):
+    """APIConnectionError mit httpx-Ursache, wie das SDK ihn auslöst."""
+    try:
+        raise anthropic.APIConnectionError(request=anf) from ursache
+    except anthropic.APIConnectionError as fehler:
+        return fehler
+
+
 def test_keine_verbindung_beendet_restliche_anfragen():
-    """Nach dem ersten Verbindungsfehler enden die übrigen Anfragen sofort."""
+    """Ganz ohne Verbindung (keine einzige Antwort, wiederholt scheitert schon
+    der Verbindungsaufbau) enden die übrigen Anfragen sofort."""
     anf = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
     aufrufe = []
 
     def stream(**kw):
         aufrufe.append(1)
         time.sleep(0.05)
-        raise anthropic.APIConnectionError(request=anf)
+        raise _verbindungsfehler(anf, httpx.ConnectError("keine Verbindung", request=anf))
 
     client = types.SimpleNamespace(beta=types.SimpleNamespace(
         messages=types.SimpleNamespace(stream=stream)))
     s = strecke("fehlerhaft")
-    with _Ersetzt(engine, _neuer_client=lambda: client, api_schluessel_vorhanden=lambda: True):
+    with _Ersetzt(engine, _neuer_client=lambda: client, api_schluessel_vorhanden=lambda: True,
+                  WIEDERHOLUNG_WARTEZEITEN_S=(0.01, 0.01)):
         ergebnisse, ereignisse = durchlaufen(s, ["L-01", "L-04"], modus="live", max_parallel=2)
     gesamt = [e for e in ereignisse if e.art == "prefetch"][-1].llm_gesamt
     for cid in ("L-01", "L-04"):
         e = ergebnisse[cid]
         assert e.status == engine.FEHLGESCHLAGEN and "Keine Verbindung" in e.hinweis, e.hinweis
         assert "Notfallschalter in der Seitenleiste" in e.hinweis, e.hinweis
-    assert len(aufrufe) <= 4 < gesamt, (len(aufrufe), gesamt)
+    assert len(aufrufe) <= 6 < gesamt, (len(aufrufe), gesamt)
     assert ereignisse[-1].llm_beantwortet == 0, "fehlgeschlagene Anfragen sind keine Antworten"
+
+
+def test_einzelne_abbrueche_beenden_den_lauf_nicht():
+    """Das Netz funktioniert, aber einzelne Verbindungen brechen ab (z. B. ein
+    Firmen-Proxy unter Last): nur diese Anfragen werden wiederholt, alle
+    Checks laufen durch, nichts wird als „keine Verbindung“ abgebrochen."""
+    anf = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    s = strecke("fehlerhaft")
+    basis = AttrappenClient(_referenz_cache_kopie(), s._ns["_LLM_SYSTEM"], verzoegerung_s=0.01)
+    zaehler = {"n": 0, "abbrueche": 0}
+    sperre = threading.Lock()
+
+    def stream(**kw):
+        with sperre:
+            zaehler["n"] += 1
+            n = zaehler["n"]
+        if n in (3, 6, 7, 12):              # mitten im Lauf: Verbindungen brechen ab
+            with sperre:
+                zaehler["abbrueche"] += 1
+            ursache = (httpx.ReadError("Verbindung zurückgesetzt") if n != 7
+                       else httpx.ConnectError("Proxy überlastet", request=anf))
+            raise _verbindungsfehler(anf, ursache)
+        return basis._stream(**kw)
+
+    client = types.SimpleNamespace(beta=types.SimpleNamespace(
+        messages=types.SimpleNamespace(stream=stream)))
+    ids = ["L-01", "L-02", "L-03", "L-04"]
+    with _Ersetzt(engine, _neuer_client=lambda: client, api_schluessel_vorhanden=lambda: True,
+                  WIEDERHOLUNG_WARTEZEITEN_S=(0.01, 0.01)):
+        ergebnisse, ereignisse = durchlaufen(s, ids, modus="live", max_parallel=4)
+    assert zaehler["abbrueche"] == 4
+    for cid in ids:
+        assert ergebnisse[cid].status == _REPLAY_STATUS["fehlerhaft"][cid], (cid, ergebnisse[cid].hinweis)
+    assert ereignisse[-1].llm_beantwortet == ereignisse[-1].llm_gesamt
 
 
 def test_fallback_und_modellwahl():
@@ -558,8 +602,9 @@ def test_client_einstellungen_und_wiederholungen():
     erzeugt = []
     with _Ersetzt(engine, anthropic=types.SimpleNamespace(
             Anthropic=lambda **kw: erzeugt.append(kw) or kw)):
-        engine._neuer_client()
-    kw = erzeugt[0]
+        # test_app.py ersetzt _neuer_client durch eine Netzwerksperre
+        getattr(engine, "_neuer_client_echt", engine._neuer_client)()
+    kw = erzeugt[-1]          # davor ggf. der Offline-Client aus _sdk_aufwaermen()
     assert kw["max_retries"] == 2, kw
     assert kw["timeout"].connect == 10.0 and kw["timeout"].read == 240.0, kw["timeout"]
     assert "api_key" not in kw, "API-Schlüssel kommt aus der Umgebung"
@@ -884,6 +929,7 @@ def main() -> int:
     tests = [test_replay_gegen_referenzberichte, test_live_attrappe_parallel,
              test_live_ohne_schluessel, test_live_fehlerbehandlung,
              test_fehler_mitten_im_antwortstrom, test_keine_verbindung_beendet_restliche_anfragen,
+             test_einzelne_abbrueche_beenden_den_lauf_nicht,
              test_fallback_und_modellwahl, test_client_einstellungen_und_wiederholungen,
              test_warten_auf_zukunft_mit_timeouterror, test_modellname_im_hinweis_je_lauf,
              test_identische_anfragen_nur_einmal, test_notfall_fehlender_eintrag,

@@ -255,6 +255,55 @@ class SprachmodellFehler(RuntimeError):
 KEINE_VERBINDUNG = ("Keine Verbindung zur Anthropic-API – Notfallschalter in der "
                     "Seitenleiste verwenden.")
 
+# Protokoll für die Fehlersuche (z. B. auf einem Firmenrechner): Ist die
+# Umgebungsvariable TB_PROTOKOLL gesetzt (das Präsentationspaket setzt sie),
+# wird jeder fehlgeschlagene Versuch mit Einzelheiten dorthin geschrieben –
+# nie der API-Schlüssel.
+_PROTOKOLL_SPERRE = threading.Lock()
+
+
+def protokolliere(text: str) -> None:
+    pfad = os.environ.get("TB_PROTOKOLL")
+    if not pfad:
+        return
+    try:
+        with _PROTOKOLL_SPERRE, open(pfad, "a", encoding="utf-8") as datei:
+            datei.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}  {text}\n")
+    except OSError:
+        pass
+
+
+def _fehler_einzelheiten(fehler: BaseException) -> str:
+    """Ursachenkette eines Fehlers für das Protokoll: Klassen, HTTP-Status,
+    Request-ID und Anfang des Antwortkörpers (z. B. Seite eines Proxys)."""
+    teile, gesehen, f = [], set(), fehler.__cause__
+    while f is not None and id(f) not in gesehen:
+        gesehen.add(id(f))
+        eintrag = f"{type(f).__module__}.{type(f).__name__}: {_kurz(f, 160)}"
+        antwort = getattr(f, "response", None)
+        if antwort is not None:
+            try:
+                eintrag += (f" [HTTP {antwort.status_code}, request-id "
+                            f"{antwort.headers.get('request-id', '-')}, "
+                            f"{_kurz(antwort.text, 200)}]")
+            except Exception:
+                pass
+        teile.append(eintrag)
+        f = f.__cause__ or f.__context__
+    return " <- ".join(teile) or "-"
+
+
+def _ist_verbindungsaufbau(fehler: BaseException) -> bool:
+    """True, wenn schon der Verbindungsaufbau scheiterte (DNS, abgewiesen,
+    Zeitüberschreitung beim Verbinden) – im Unterschied zu Abbrüchen einer
+    bestehenden Verbindung."""
+    f = fehler.__cause__
+    while f is not None:
+        if isinstance(f, (httpx.ConnectError, httpx.ConnectTimeout)):
+            return True
+        f = f.__cause__ or f.__context__
+    return False
+
 
 class _LaufAbgebrochen(Exception):
     """Der Prüflauf wurde abgebrochen (z. B. weil die GUI neu geladen hat)."""
@@ -695,6 +744,25 @@ def _verzoegerungsplan(wert) -> tuple[dict[str, float], float, float]:
                          f"(Sekunden), \"live\" oder dict je Check-ID") from None
 
 
+def _mit_werkzeug_protokoll(werkzeug_ergebnisse: Callable | None) -> Callable | None:
+    """Werkzeugaufrufe (Tool Use des Notebooks) ausführen und fürs Protokoll
+    festhalten, wie viele Ergebnisse aus der gespeicherten Kopie kamen."""
+    if werkzeug_ergebnisse is None:
+        return None
+
+    def mit_protokoll(werkzeuge, inhalt):
+        beginn = time.monotonic()
+        ergebnisse = werkzeug_ergebnisse(werkzeuge, inhalt)
+        if os.environ.get("TB_PROTOKOLL"):
+            kopie = sum("gespeicherte Kopie" in str(e.get("content", "")) for e in ergebnisse)
+            fehler = [_kurz(e.get("content"), 100) for e in ergebnisse if e.get("is_error")]
+            protokolliere(f"Werkzeug: {len(ergebnisse)} Abrufe in {time.monotonic() - beginn:.1f} s, "
+                          f"{kopie} aus der gespeicherten Kopie"
+                          + (f", Fehlermeldungen: {fehler}" if fehler else ""))
+        return ergebnisse
+    return mit_protokoll
+
+
 class _Lauf:
     """Hält die Sprachmodell-Antworten eines Prüflaufs (nur im Speicher)."""
 
@@ -716,14 +784,16 @@ class _Lauf:
         self.vorab: dict[str, _Anfrage] = {}           # eindeutige Vorab-Anfragen
         self.anfragen_je_check: Counter = Counter()
         self.live_aufrufe = 0
-        self.keine_verbindung = False      # nach dem ersten Verbindungsfehler gesetzt
+        self.keine_verbindung = False      # gesetzt, wenn offenbar gar keine Verbindung besteht
+        self.antworten_erhalten = 0        # erfolgreiche Live-Antworten dieses Laufs
+        self.verbindungsaufbau_fehler = 0  # Fehlschläge schon beim Verbindungsaufbau
         self._executor: ThreadPoolExecutor | None = None
         self._client = None
         ns = strecke._ns
         self._ueberspringen = ns["CheckUebersprungen"]
         self._system = ns["_LLM_SYSTEM"]
         self._max_aufrufe = int(ns.get("MAX_LLM_AUFRUFE") or MAX_LLM_AUFRUFE)
-        self._werkzeug_ergebnisse = ns.get("werkzeug_ergebnisse")   # Tool Use (Notebook)
+        self._werkzeug_ergebnisse = _mit_werkzeug_protokoll(ns.get("werkzeug_ergebnisse"))
         self._max_runden = int(ns.get("MAX_WERKZEUG_RUNDEN") or 5)
 
     # ----------------------------------------------------------- Grundlagen
@@ -776,14 +846,34 @@ class _Lauf:
                 if self._client is None:
                     self._client = _neuer_client()
                 client = self._client
+            beginn = time.monotonic()
             try:
-                return _live_anfrage(client, self.modell, anfrage, self._system,
-                                     self._werkzeug_ergebnisse, self._max_runden)
+                ergebnis = _live_anfrage(client, self.modell, anfrage, self._system,
+                                         self._werkzeug_ergebnisse, self._max_runden)
+                with self.sperre:
+                    self.antworten_erhalten += 1
+                return ergebnis
             except SprachmodellFehler as fehler:
+                protokolliere(f"{check_id or '?'} Versuch {versuch + 1} nach "
+                              f"{time.monotonic() - beginn:.1f} s: {fehler} | "
+                              f"{_fehler_einzelheiten(fehler)}")
                 if fehler.verbindung:
-                    self.keine_verbindung = True
-                    raise
-                if not fehler.voruebergehend or versuch >= len(WIEDERHOLUNG_WARTEZEITEN_S):
+                    # Nur wenn noch keine einzige Antwort kam und mehrfach schon der
+                    # Verbindungsaufbau scheiterte, besteht offenbar gar keine
+                    # Verbindung: dann enden die übrigen Anfragen sofort (Hinweis
+                    # auf den Notfallschalter). Sonst – das Netz funktioniert, nur
+                    # einzelne Anfragen brechen ab (z. B. Firmen-Proxy unter Last) –
+                    # wie einen vorübergehenden Fehler wiederholen.
+                    with self.sperre:
+                        if _ist_verbindungsaufbau(fehler):
+                            self.verbindungsaufbau_fehler += 1
+                        offline = (self.antworten_erhalten == 0
+                                   and self.verbindungsaufbau_fehler >= 3)
+                        if offline:
+                            self.keine_verbindung = True
+                    if offline or versuch >= len(WIEDERHOLUNG_WARTEZEITEN_S):
+                        raise
+                elif not fehler.voruebergehend or versuch >= len(WIEDERHOLUNG_WARTEZEITEN_S):
                     raise
                 # Vorübergehender Fehler: kurz warten (abbrechbar), neu versuchen.
                 pause = WIEDERHOLUNG_WARTEZEITEN_S[versuch] * random.uniform(0.8, 1.2)
@@ -1042,6 +1132,8 @@ class Pruefstrecke:
         # Checks schreiben dort STANDARDMODELL; _fuehre_aus tauscht ihn je Lauf.
         gesamt = len(eintraege)
         llm_eintraege = [e for e in eintraege if e["methode"] == "LLM"]
+        protokolliere(f"Lauf beginnt: {self.dokument}, Modus {lauf.modus}, Modell {lauf.modell}, "
+                      f"bis zu {lauf.max_parallel} parallel, {gesamt} Checks")
         try:
             # 1) Sammeldurchlauf + paralleler Vorabruf aller Modellanfragen
             if llm_eintraege and lauf.hinderungsgrund() is None:
@@ -1063,6 +1155,11 @@ class Pruefstrecke:
                                text=f"{e['id']} {e['titel']}: {ergebnis.status}")
             n_fehler = sum(b.schwere == FEHLER for r in ergebnisse for b in r.befunde)
             n_warnungen = sum(b.schwere == WARNUNG for r in ergebnisse for b in r.befunde)
+            beantwortet, alle = lauf.gesamtfortschritt()
+            gescheitert = [r.id for r in ergebnisse if r.status == FEHLGESCHLAGEN]
+            protokolliere(f"Lauf beendet: {n_fehler} Fehler, {n_warnungen} Warnungen, "
+                          f"{beantwortet} von {alle} Antworten"
+                          + (f", fehlgeschlagen: {', '.join(gescheitert)}" if gescheitert else ""))
             yield ereignis("fertig", None, gesamt, gesamt,
                            text=f"Prüfung abgeschlossen: {n_fehler} Fehler, "
                                 f"{n_warnungen} Warnungen ({gesamt} Checks).")

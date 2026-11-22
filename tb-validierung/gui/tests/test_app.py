@@ -92,6 +92,8 @@ def _kein_netz():
     raise AssertionError("Im Test darf kein API-Client erzeugt werden (Netzwerk gesperrt).")
 
 
+# das Original bleibt für test_client_einstellungen_und_wiederholungen erreichbar
+engine._neuer_client_echt = getattr(engine, "_neuer_client_echt", engine._neuer_client)
 engine._neuer_client = _kein_netz
 ORIGINAL_LAUFE = engine.Pruefstrecke.laufe
 

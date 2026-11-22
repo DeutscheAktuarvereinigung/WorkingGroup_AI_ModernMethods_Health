@@ -26,7 +26,7 @@
       "methode": "deterministisch",
       "status": "BESTANDEN",
       "hinweis": "252 Teil-Verweise und 35 Gleichungs-Verweise geprüft.",
-      "dauer_s": 0.01,
+      "dauer_s": 0.0,
       "befunde": []
     },
     {
@@ -76,7 +76,7 @@
       "methode": "deterministisch",
       "status": "BESTANDEN",
       "hinweis": "24 Spalten den Referenz-CSVs zugeordnet, 2160 Zellen verglichen.",
-      "dauer_s": 0.06,
+      "dauer_s": 0.04,
       "befunde": []
     },
     {
@@ -136,7 +136,7 @@
       "methode": "deterministisch",
       "status": "BESTANDEN",
       "hinweis": "8 Spalten der Datenbank zugeordnet, 720 Zellen verglichen (rechnungsgrundlagen.db).",
-      "dauer_s": 0.01,
+      "dauer_s": 0.0,
       "befunde": []
     },
     {
@@ -146,7 +146,7 @@
       "methode": "LLM",
       "status": "BESTANDEN",
       "hinweis": "15 Text-Chunks mit claude-sonnet-5 geprüft.",
-      "dauer_s": 0.03,
+      "dauer_s": 0.01,
       "befunde": []
     },
     {
@@ -166,7 +166,7 @@
       "methode": "LLM",
       "status": "WARNUNG",
       "hinweis": "15 Teil-Paare mit claude-sonnet-5 verglichen.",
-      "dauer_s": 0.02,
+      "dauer_s": 0.01,
       "befunde": [
         {
           "schwere": "WARNUNG",
@@ -218,7 +218,7 @@
       "methode": "LLM",
       "status": "BESTANDEN",
       "hinweis": "22 Formelseiten als Bild geprüft (claude-sonnet-5).",
-      "dauer_s": 1.2,
+      "dauer_s": 0.77,
       "befunde": []
     },
     {
@@ -228,7 +228,7 @@
       "methode": "LLM",
       "status": "BESTANDEN",
       "hinweis": "2 Diagrammseite(n) blind abgelesen (claude-sonnet-5), 4 Kurven deterministisch den Tabellenspalten zugeordnet (krass = Median-Abweichung > 20 %). Ablesegenauigkeit: S.75: Die x-Achse reicht von 20 bis 110 mit Gitterlinien in 10er-Schritten, die y-Achse von 1 bis 6 mit Gitterlinien in 1er-Schritten. Die Kurvenpunkte wurden anhand der Rasterlinien und der Kurvensteigung visuell interpoliert; eine Ablesegenauigkeit von besser als ±0,1–0,2 Einheiten ist bei der Diagrammauflösung nicht möglich, besonders im steilen Anstiegsbereich zwischen 50 und 80 Jahren. Die Plateauwerte ab etwa Alter 90 sind gut ablesbar, da die Kurven dort flach verlaufen. | S.78: Y-Achse ist skaliert mit Faktor 10^4 und rei",
-      "dauer_s": 0.24,
+      "dauer_s": 0.14,
       "befunde": []
     }
   ]

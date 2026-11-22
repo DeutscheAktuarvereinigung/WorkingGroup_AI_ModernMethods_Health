@@ -32,7 +32,7 @@
       "methode": "deterministisch",
       "status": "BESTANDEN",
       "hinweis": "252 Teil-Verweise und 35 Gleichungs-Verweise geprüft.",
-      "dauer_s": 0.01,
+      "dauer_s": 0.0,
       "befunde": []
     },
     {
@@ -220,7 +220,7 @@
       "methode": "LLM",
       "status": "FEHLER",
       "hinweis": "15 Text-Chunks mit claude-sonnet-5 geprüft.",
-      "dauer_s": 0.02,
+      "dauer_s": 0.01,
       "befunde": [
         {
           "schwere": "FEHLER",
@@ -262,7 +262,7 @@
       "methode": "LLM",
       "status": "WARNUNG",
       "hinweis": "15 Teil-Paare mit claude-sonnet-5 verglichen.",
-      "dauer_s": 0.03,
+      "dauer_s": 0.01,
       "befunde": [
         {
           "schwere": "WARNUNG",
@@ -339,7 +339,7 @@
       "methode": "LLM",
       "status": "FEHLER",
       "hinweis": "22 Formelseiten als Bild geprüft (claude-sonnet-5).",
-      "dauer_s": 1.44,
+      "dauer_s": 0.76,
       "befunde": [
         {
           "schwere": "FEHLER",
@@ -365,7 +365,7 @@
       "methode": "LLM",
       "status": "FEHLER",
       "hinweis": "2 Diagrammseite(n) blind abgelesen (claude-sonnet-5), 4 Kurven deterministisch den Tabellenspalten zugeordnet (krass = Median-Abweichung > 20 %). Ablesegenauigkeit: S.75: Die y-Achse ist von 1 bis 6 in Schritten von 1 beschriftet, mit Gitterlinien auf jeder ganzen Einheit; eine Zwischenschätzung auf ca. 0,1 ist möglich. Die x-Achse ist von 20 bis 110 in Schritten von 10 beschriftet. Beide Kurven verlaufen im Bereich x=20-40 nahe beieinander und sind dort schwer präzise zu trennen; ab x=60 werden die Kurven deutlicher unterscheidbar. Ab ca. x=90 laufen beide Kurven in ein Plateau, das gut ablesbar ist. Die Ablesegenauigkeit ist im flachen Bereich (20-50) geringer als im steigenden Bereich (60",
-      "dauer_s": 0.29,
+      "dauer_s": 0.14,
       "befunde": [
         {
           "schwere": "FEHLER",
